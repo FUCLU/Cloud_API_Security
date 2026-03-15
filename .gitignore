@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+*.coverage
+
+# ENV
+.env
+.env.*
+*.env.local
+
+# Logs
+*.log
+
+# Security captures
+*.pcap
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python environments
+venv/
+.env/
+
+# Database volumes
+postgres_data/

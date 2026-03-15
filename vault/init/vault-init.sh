@@ -1,0 +1,2 @@
+vault secrets enable transit
+vault write -f transit/keys/api-key

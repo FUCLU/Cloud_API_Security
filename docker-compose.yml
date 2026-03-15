@@ -1,0 +1,111 @@
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: api-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: cloudapi
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: api-backend
+    depends_on:
+      - postgres
+      - opa
+    ports:
+    - "9000:8001"
+    environment:
+      DATABASE_URL: postgresql://admin:admin123@postgres:5432/cloudapi
+      OPA_URL: http://opa:8181
+      VAULT_ADDR: http://vault:8200
+
+  kong:
+    image: kong:3.6
+    container_name: api-gateway
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    volumes:
+      - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
+      - ./gateway/plugins:/usr/local/kong/plugins
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    command: start-dev --import-realm
+    ports:
+      - "8081:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: opa
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--config-file=/config/opa-config.yaml"
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./opa/config:/config
+      - ./opa/policies:/policies
+
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml
+    command: -config.file=/etc/loki/loki-config.yml
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - ./EVIDENCE/logs:/logs
+    command: -config.file=/etc/promtail/config.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  postgres_data:

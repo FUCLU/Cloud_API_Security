@@ -1,0 +1,9 @@
+_format_version: "3.0"
+
+services:
+  - name: backend-service
+    url: http://backend:8001
+    routes:
+      - name: backend-route
+        paths:
+          - /api
