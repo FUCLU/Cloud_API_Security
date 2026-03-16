@@ -1,14 +1,12 @@
 # RUNBOOK — Cloud API Security Stack
 
----
-
 ## ⚡ Quick Start
 
 > Không muốn đọc dài :)) Chạy 5 lệnh này là xong.
 
 ```bash
-git clone https://github.com/<your-org>/Cloud_Api_Security.git
-cd Cloud_Api_Security
+git clone https://github.com/FUCLU/Cloud_API_Security.git
+cd Cloud_API_Security
 cp .env.example .env          # chỉnh secrets trong .env trước khi chạy
 docker compose up -d
 docker compose exec backend python -m app.db.seed_data
@@ -83,8 +81,8 @@ newgrp docker
 
 ```bash
 # Clone repo
-git clone https://github.com/<your-org>/Cloud_Api_Security.git
-cd Cloud_Api_Security
+git clone https://github.com/FUCLU/Cloud_API_Security.git
+cd Cloud_API_Security
 
 # Tạo file .env từ mẫu
 cp .env.example .env
