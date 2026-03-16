@@ -37,7 +37,7 @@ Dự án xây dựng một hệ thống API security hoàn chỉnh, bao gồm:
 ---
 
 ## Kiến trúc hệ thống
-
+```
 Internet — Client (SPA / Mobile / 3rd-party)
         │  HTTPS / TLS 1.3
         ▼
@@ -98,7 +98,7 @@ Internet — Client (SPA / Mobile / 3rd-party)
   │   Promtail ──► Loki ──► Grafana Dashboard          │
   │                         api-security-dashboard.json│
   └────────────────────────────────────────────────────┘
-
+```
 Sơ đồ đầy đủ: [`ARCH/ARCH.drawio`](ARCH/ARCH.drawio) (mở bằng [draw.io](https://app.diagrams.net)) hoặc [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
 
 **Port mapping Docker (D1):**
