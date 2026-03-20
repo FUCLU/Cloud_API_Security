@@ -30,7 +30,7 @@ xdg-open http://localhost:9000/docs   # Linux
 
 | Service | URL | Ghi chú |
 |---|---|---|
-| 🌐 FastAPI Backend | `http://localhost:9000/docs` | Swagger UI, debug trực tiếp |
+| 🌐 FastAPI Backend | `http://localhost:9002/docs` | Swagger UI, debug trực tiếp |
 | ⚡ Kong API Gateway | `http://localhost:8000/api` | Entry point chính — dùng port này để test |
 | 🔑 Keycloak Admin | `http://localhost:8081` | UI: `/admin` · OIDC: `/realms/apirealm` |
 | 📋 OPA | `http://localhost:8181` | REST API: `/v1/policies`, `/v1/data` |
@@ -148,10 +148,10 @@ kong         gateway     running (healthy)   0.0.0.0:8000->8000/tcp
 keycloak     idp         running (healthy)   0.0.0.0:8081->8080/tcp
 opa          opa         running (healthy)   0.0.0.0:8181->8181/tcp
 vault        vault       running (healthy)   0.0.0.0:8200->8200/tcp
-postgres     db          running (healthy)   5432/tcp
+postgres     db          running (healthy)   5434/tcp
 loki         loki        running (healthy)   3100/tcp
 grafana      grafana     running (healthy)   0.0.0.0:3000->3000/tcp
-backend      backend     running (healthy)   0.0.0.0:9000->9000/tcp
+backend      backend     running (healthy)   0.0.0.0:9002->9000/tcp
 ```
 
 ### 3.3 Seed dữ liệu
@@ -191,7 +191,7 @@ curl -i -H "Authorization: Bearer $TOKEN" http://localhost:9000/api/v1/users
 | Service | URL | Credentials |
 |---|---|---|
 | Kong Admin API | `http://localhost:8001` | — (internal admin port) |
-| FastAPI Swagger | `http://localhost:9000/docs` | — (JWT required cho secured routes) |
+| FastAPI Swagger | `http://localhost:9002/docs` | — (JWT required cho secured routes) |
 | Keycloak Admin | `http://localhost:8081/admin` | `admin` / giá trị `KEYCLOAK_ADMIN_PASSWORD` trong `.env` |
 | Keycloak OIDC | `http://localhost:8081/realms/apirealm` | — |
 | Vault UI | `http://localhost:8200` | Token: `VAULT_DEV_ROOT_TOKEN_ID` trong `.env` |

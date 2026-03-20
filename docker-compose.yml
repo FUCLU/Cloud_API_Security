@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin123
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -21,7 +21,7 @@ services:
       - postgres
       - opa
     ports:
-    - "9000:8001"
+    - "9002:8001"
     environment:
       DATABASE_URL: postgresql://admin:admin123@postgres:5432/cloudapi
       OPA_URL: http://opa:8181

@@ -278,7 +278,7 @@ docker compose exec backend python -m app.db.seed_data
 
 # Bước 5 — Kiểm tra nhanh
 curl http://localhost:8000/api/v1/products   # qua Kong → 200 OK
-curl http://localhost:9000/docs              # FastAPI Swagger UI
+curl http://localhost:9002/docs              # FastAPI Swagger UI
 ```
 
 ---
@@ -287,7 +287,7 @@ curl http://localhost:9000/docs              # FastAPI Swagger UI
 
 | Service | URL | Mô tả |
 |---|---|---|
-| 🌐 FastAPI (Backend) | [`http://localhost:9000/docs`](http://localhost:9000/docs) | Swagger UI, thử API trực tiếp (debug only) |
+| 🌐 FastAPI (Backend) | [`http://localhost:9002/docs`](http://localhost:9000/docs) | Swagger UI, thử API trực tiếp (debug only) |
 | ⚡ Kong API Gateway | [`http://localhost:8000/api`](http://localhost:8000/api) | Entry point chính cho mọi request |
 | 🔑 Keycloak Admin | [`http://localhost:8081`](http://localhost:8081) | Quản lý realm, user, token |
 | 📋 OPA | [`http://localhost:8181`](http://localhost:8181) | Policy engine, decision log |
@@ -312,7 +312,7 @@ curl -i -H "Authorization: Bearer $TOKEN" \
 
 # Gọi trực tiếp backend (bypass Kong — chỉ dùng khi debug nội bộ)
 curl -i -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9000/api/v1/users
+  http://localhost:9002/api/v1/users
 ```
 
 Chi tiết đầy đủ: [`DEPLOY/D1/Runbook.md`](DEPLOY/D1/Runbook.md)
