@@ -477,7 +477,7 @@ open http://localhost:5173                   # Frontend
 ---
 
 ## 🖥 Hướng dẫn Frontend
-
+![alt text](image.png)
 ### Chạy development (standalone)
 
 ```bash
