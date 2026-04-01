@@ -1,8 +1,8 @@
 # CRYPTO_SOLUTION — Giải pháp Mật mã 3 Lớp
 
-> **Đề tài:** Cloud API-Based Network Application Security for Small Company Services  
-> **Môn:** NT219.Q21.ANTT — Mật mã học | UIT  
-> **Stack:** Kong 3.6 · Keycloak 24.0 · HashiCorp Vault 1.15 · FastAPI 0.110.0 · OPA 0.65.0
+> **Đề tài:** Cloud API-Based Network Application Security for Small Company Services
+> **Môn:** NT219.Q21.ANTT — Mật mã học | UIT
+> **Stack:** Kong 3.6 · Keycloak 24.0 (realm: **lab**) · HashiCorp Vault **1.15** · FastAPI 0.110.0 · OPA 0.65.0
 
 ---
 
@@ -13,13 +13,16 @@ Hệ thống áp dụng **Defense-in-Depth** với 3 lớp mật mã độc lậ
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  LỚP 1 — CRYPTO (Bảo vệ dữ liệu)                                │
-│  TLS 1.3 truyền tải · AES-256-GCM lưu trữ · KEK/DEK Vault       │
+│  TLS 1.3 truyền tải · AES-256-GCM lưu trữ · KEK/DEK Vault 1.15  │
 ├─────────────────────────────────────────────────────────────────┤
 │  LỚP 2 — AuthN (Xác thực danh tính)                             │
-│  TOTP / WebAuthn · PKCE · JWT RS256 · DPoP / mTLS               │
+│  TOTP / PKCE · JWT RS256 · DPoP (RFC 9449) / mTLS               │
 ├─────────────────────────────────────────────────────────────────┤
 │  LỚP 3 — AuthZ (Kiểm soát quyền)                                │
 │  OPA Rego · deny-by-default · RBAC → ABAC · 100% decision log   │
+├─────────────────────────────────────────────────────────────────┤
+│  WAF EQUIVALENT — Kong + OPA (phù hợp SME)                      │
+│  Rate-limit · JWT malformed block · HSTS · Policy enforcement   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,6 +103,7 @@ class AEADEncryption:
 ```
 
 **Tại sao GCM an toàn hơn CBC:**
+
 | Thuộc tính | AES-CBC | AES-256-GCM |
 |---|---|---|
 | Confidentiality | ✅ | ✅ |
@@ -118,20 +122,20 @@ python3 scripts/evaluation/e_c3_aead_integrity.py
 
 ---
 
-### 1.3 Quản lý Khóa: Envelope Encryption qua HashiCorp Vault
+### 1.3 Quản lý Khóa: Envelope Encryption qua HashiCorp Vault 1.15
 
 **Chuẩn áp dụng:** NIST SP 800-57 — Key Management
 
 Hệ thống dùng **envelope encryption** với 2 cấp khóa:
 
 ```
-KEK (Key Encryption Key)  ← Quản lý bởi Vault Transit Engine
+KEK (Key Encryption Key)  ← Quản lý bởi Vault Transit Engine (hashicorp/vault:1.15)
  └── DEK (Data Encryption Key)  ← Dùng để mã hóa dữ liệu thực
-      └── Ciphertext (dữ liệu trong PostgreSQL)
+      └── Ciphertext (dữ liệu trong PostgreSQL 16)
 ```
 
 **Luồng hoạt động:**
-1. Backend gọi Vault API → nhận DEK đã được Vault mã hóa bằng KEK
+1. Backend gọi Vault API (`http://vault:8200`) → nhận DEK đã được Vault mã hóa bằng KEK
 2. Backend dùng DEK decrypt/encrypt dữ liệu tại memory
 3. DEK không bao giờ được persist — chỉ tồn tại trong RAM khi cần
 4. Vault giữ KEK trong secure enclave — backend không bao giờ thấy KEK
@@ -142,41 +146,28 @@ KEK (Key Encryption Key)  ← Quản lý bởi Vault Transit Engine
 export VAULT_ADDR=http://localhost:8200
 export VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
 
-# Enable Transit Secrets Engine
 vault secrets enable transit
-
-# Tạo DEK key (AES-256-GCM)
 vault write -f transit/keys/dek type=aes256-gcm96
-
-# Apply policy — backend chỉ có quyền encrypt/decrypt, không đọc được key
 vault policy write dek-policy vault/policies/dek-policy.hcl
 ```
 
 **Policy tối thiểu (vault/policies/dek-policy.hcl):**
 ```hcl
-# Backend chỉ được encrypt và decrypt — không thể export key raw
 path "transit/encrypt/dek" {
   capabilities = ["update"]
 }
-
 path "transit/decrypt/dek" {
   capabilities = ["update"]
 }
-
-# Không có quyền: read key, list keys, rotate, delete
 ```
 
 **Key Rotation SLA (Invariant I6 — E-X1.md):**
 ```bash
-# Rotate DEK — trigger thủ công hoặc scheduled
 vault write -f transit/keys/dek/rotate
-
-# SLA: ≤ 10 phút từ lúc rotate đến key mới active
-# Old key version bị revoke sau ≤ 24h
+# SLA: ≤10 phút từ lúc rotate đến key mới active
+# Old key version bị revoke sau ≤24h
 
 bash scripts/evaluation/e_x1_rotation_test.sh
-# Đo: thời gian từ rotate command → first successful encrypt với key mới
-# Expected: Δt ≤ 10 phút
 ```
 
 ---
@@ -187,224 +178,146 @@ bash scripts/evaluation/e_x1_rotation_test.sh
 
 **Chuẩn áp dụng:** NIST SP 800-63B — AAL2; RFC 6238 — TOTP
 
-TOTP (Time-based One-Time Password) là MFA bắt buộc cho tất cả user. Không có bypass route. Implementation sử dụng thư viện `pyotp==2.9.0`.
+TOTP bắt buộc cho admin (role `admin`). Không có bypass route. Keycloak realm `lab` xử lý toàn bộ TOTP flow — frontend không render OTP form.
 
 **Triển khai (backend/app/security/totp_verify.py):**
 ```python
-import pyotp
-from datetime import datetime
+import pyotp  # pyotp==2.9.0
 
 class TOTPVerifier:
     def verify(self, secret: str, otp_code: str) -> bool:
-        """
-        Verify TOTP với time window ±1 (30s interval).
-        NIST SP 800-63B khuyến nghị không cho phép window quá lớn.
-        """
         totp = pyotp.TOTP(secret)
-        # valid_window=1: chấp nhận code của interval trước và sau (clock skew)
-        return totp.verify(otp_code, valid_window=1)
+        return totp.verify(otp_code, valid_window=1)  # ±30s clock skew
 
     def generate_secret(self) -> str:
-        """Tạo secret ngẫu nhiên base32 cho user mới."""
         return pyotp.random_base32()  # 160-bit entropy
 ```
 
-**Keycloak TOTP (idp/keycloak/realm-export.json):**
+**Keycloak TOTP config (idp/keycloak/realm-export.json, realm=lab):**
 - Algorithm: HmacSHA1 (RFC 4226)
 - Digits: 6
 - Period: 30 giây
-- Look-ahead window: 1
+- Required Action: CONFIGURE_TOTP bắt buộc cho role admin
 
-**Kiểm tra (Invariant I4 — E-N1.md):**
+**Kiểm tra (Invariant I4, I7 — E-N1.md):**
 ```bash
 python3 scripts/evaluation/e_n1_totp_test.py
-# Expected:
-#   - Success rate ≥ 99% với valid OTP + valid window
-#   - False-accept rate = 0% với expired/invalid OTP
-#   - Replay của OTP đã dùng bị reject (jti tracking)
+# 100 tests: 90 valid + 10 invalid
+# Expected: success ≥99%, false-accept = 0%
 ```
 
 ---
 
-### 2.2 OAuth 2.0 + PKCE Flow
+### 2.2 Authorization Code + PKCE
 
-**Chuẩn áp dụng:** RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), OpenID Connect Core 1.0
+**Chuẩn áp dụng:** RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), RFC 8414 (OIDC Discovery)
 
-**PKCE (Proof Key for Code Exchange)** ngăn Authorization Code Interception Attack — đặc biệt quan trọng với SPA (React) không thể giữ secret.
+PKCE bắt buộc cho public clients (SPA). Không thể thiếu `code_challenge`.
 
-**Luồng PKCE S256 (frontend/src/auth/keycloak.js):**
-```javascript
-// Bước 1: Tạo code_verifier ngẫu nhiên
-const codeVerifier = generateRandomString(64);  // 256-bit entropy
-// Bước 2: Tính code_challenge = BASE64URL(SHA256(code_verifier))
-const codeChallenge = await sha256Base64url(codeVerifier);
-
-// Bước 3: Gửi authorization request với code_challenge
-const authUrl = `${KEYCLOAK_URL}/realms/cloudapi/protocol/openid-connect/auth
-  ?response_type=code
-  &client_id=frontend-spa
-  &redirect_uri=${REDIRECT_URI}
-  &code_challenge=${codeChallenge}
-  &code_challenge_method=S256
-  &scope=openid profile email`;
-
-// Bước 4: Sau khi redirect, exchange code với code_verifier (không phải challenge)
-const tokenResponse = await fetch(`${KEYCLOAK_URL}/protocol/openid-connect/token`, {
-  method: 'POST',
-  body: new URLSearchParams({
-    grant_type: 'authorization_code',
-    code: authorizationCode,
-    redirect_uri: REDIRECT_URI,
-    code_verifier: codeVerifier,  // Keycloak verify SHA256(code_verifier) == code_challenge
-    client_id: 'frontend-spa',
-  })
-});
+**Luồng Frontend:**
+```
+1. Frontend tạo code_verifier (random 43–128 ký tự)
+2. code_challenge = BASE64URL(SHA256(code_verifier))
+3. Redirect đến Keycloak:
+   GET http://localhost:8081/realms/lab/protocol/openid-connect/auth
+       ?response_type=code
+       &client_id=spa-client
+       &code_challenge=<hash>
+       &code_challenge_method=S256
+4. Keycloak yêu cầu login + TOTP (nếu admin)
+5. Keycloak redirect về frontend với authorization_code
+6. Frontend đổi code → token:
+   POST http://localhost:8081/realms/lab/protocol/openid-connect/token
+       grant_type=authorization_code
+       &code=<auth_code>
+       &code_verifier=<original>
+7. Nhận access_token (JWT RS256, TTL 15 phút) + refresh_token
 ```
 
-**Tại sao PKCE an toàn:**
-- `code_verifier` chỉ biết bởi client gốc — interceptor có code nhưng không có verifier
-- `code_challenge` là một chiều (SHA256) — không thể reverse
-- Keycloak verify: `SHA256(code_verifier) == code_challenge` trước khi cấp token
+**Token storage:**
+- `access_token` → memory (biến JS, không localStorage)
+- `refresh_token` → sessionStorage
+- Rotating refresh token: `revoke_refresh_token=true` trong realm settings
 
 ---
 
-### 2.3 JWT Hardening: RS256 + alg=none Block
+### 2.3 JWT Hardening: RS256 + kid control
 
-**Chuẩn áp dụng:** RFC 7519 (JWT), RFC 7515 (JWS), RFC 9068 (JWT Profile for OAuth 2.0)
+**Chuẩn áp dụng:** RFC 7519 (JWT), RFC 7515 (JWS), RFC 9068 (JWT Profile)
 
-Kong verify JWT tại edge trước khi forward bất kỳ request nào đến backend.
+**Kong plugin (gateway/plugins/jwt-hardening.lua):**
+- Pin algorithm: chỉ chấp nhận `RS256` — reject mọi alg khác kể cả `none`
+- kid whitelist: chỉ chấp nhận kid có trong JWKS endpoint Keycloak
+- JWKS endpoint: `http://keycloak:8080/realms/lab/protocol/openid-connect/certs`
 
-**Plugin jwt-hardening.lua (gateway/plugins/jwt-hardening.lua):**
-```lua
-local jwt_decoder = require "kong.plugins.jwt.jwt_parser"
+**3 attack vectors bị block (Invariant I4 — E-Z2.md):**
 
-local JwtHardeningHandler = {}
+| Vector | Cơ chế block | Log reason |
+|---|---|---|
+| `alg=none` JWT | plugin check `alg != 'none'` | `alg_none_rejected` |
+| Fake kid injection | JWKS whitelist check | `kid_not_whitelisted` |
+| Algorithm confusion (RS256 as HS256) | alg pin enforce | `alg_mismatch` |
 
-function JwtHardeningHandler:access(conf)
-  local auth_header = kong.request.get_header("Authorization")
-  if not auth_header then
-    return kong.response.exit(401, { message = "Missing Authorization header" })
-  end
-
-  local token = auth_header:match("Bearer (.+)")
-  if not token then
-    return kong.response.exit(401, { message = "Invalid Bearer token format" })
-  end
-
-  -- Parse JWT header
-  local jwt, err = jwt_decoder:new(token)
-  if err then
-    return kong.response.exit(401, { message = "Invalid JWT structure" })
-  end
-
-  -- CRITICAL: Block alg=none attack (CVE-2015-9235 class)
-  local alg = jwt.header.alg
-  if not alg or alg:lower() == "none" or alg == "" then
-    kong.log.err("SECURITY: alg=none JWT rejected from ", kong.client.get_ip())
-    return kong.response.exit(401, { message = "Algorithm 'none' not permitted" })
-  end
-
-  -- Enforce RS256 only — reject HS256, ES384, etc.
-  if alg ~= "RS256" then
-    kong.log.err("SECURITY: Unexpected alg=", alg, " rejected")
-    return kong.response.exit(401, { message = "Only RS256 algorithm is permitted" })
-  end
-
-  -- Validate kid exists and is in allowlist
-  local kid = jwt.header.kid
-  if not kid or not conf.allowed_kids[kid] then
-    return kong.response.exit(401, { message = "Unknown or missing kid" })
-  end
-
-  -- Standard claim validation: exp, iat, iss, sub
-  local now = ngx.time()
-  if jwt.claims.exp and jwt.claims.exp < now then
-    return kong.response.exit(401, { message = "Token expired" })
-  end
-end
-```
-
-**Kiểm tra (Invariant I4 — E-Z2.md):**
 ```bash
 bash scripts/evaluation/e_z2_token_hardening.sh
-# Test cases:
-#   1. JWT alg=none → 401 ✅
-#   2. JWT alg=HS256 (algorithm confusion) → 401 ✅
-#   3. JWT unknown kid → 401 ✅
-#   4. JWT expired → 401 ✅
-#   5. JWT valid RS256 + known kid → pass through ✅
+# Expected: tất cả 3 vectors → 401, log rõ ràng
 ```
 
 ---
 
-### 2.4 DPoP — Proof of Possession Token Binding
+### 2.4 DPoP Token Binding (RFC 9449)
 
-**Chuẩn áp dụng:** RFC 9449 — OAuth 2.0 DPoP
+**Chuẩn áp dụng:** RFC 9449 — OAuth 2.0 Demonstrating Proof of Possession (DPoP)
 
 DPoP bind access token với một ephemeral keypair — ngăn token bị stolen và dùng lại bởi attacker.
 
 **Cơ chế:**
-1. Client tạo ephemeral EC keypair mỗi request
-2. Client tạo DPoP proof JWT: ký bằng private key, chứa `htm` (method), `htu` (URI), `iat`, `jti`
-3. Backend verify proof signature với public key, check `jti` không bị replay
-4. Redis lưu `jti` đã dùng (SET NX + TTL = token lifetime) — prevent replay
+1. Frontend (browser) tạo ephemeral EC keypair mỗi session (Web Crypto API)
+2. Mỗi request: tạo DPoP proof JWT ký bằng private key, chứa `htm`, `htu`, `iat`, `jti`, `ath`
+3. Backend verify: proof signature, htu+htm khớp request, jti chưa dùng (Redis SET NX), ath khớp access_token
+4. Redis (container `api-redis:6379`) lưu `dpop:jti:<uuid>` với TTL = token lifetime
 
-**Triển khai (backend/app/security/dpop_verifier.py):**
-```python
-import redis
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
+**DPoP utility Frontend (frontend/src/utils/dpop.js):**
+```javascript
+async function createDpopProof(url, method, accessToken) {
+  const { privateKey, publicKey } = await window.crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]
+  );
+  const jwk = await window.crypto.subtle.exportKey("jwk", publicKey);
+  const ath = btoa(String.fromCharCode(...new Uint8Array(
+    await window.crypto.subtle.digest("SHA-256",
+      new TextEncoder().encode(accessToken))
+  ))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=/g,"");
 
-redis_client = redis.Redis(host='redis', port=6379, db=0)
-
-class DPoPVerifier:
-    def verify(self, dpop_header: str, expected_method: str, expected_uri: str) -> bool:
-        """Verify DPoP proof theo RFC 9449."""
-        try:
-            # Decode header để lấy public key (unverified)
-            unverified = jwt.get_unverified_header(dpop_header)
-            if unverified.get("typ") != "dpop+jwt":
-                return False
-
-            # Extract public key từ JWK trong header
-            jwk = unverified.get("jwk")
-            if not jwk:
-                return False
-
-            # Verify signature bằng public key trong proof itself
-            claims = jwt.decode(dpop_header, jwk, algorithms=["ES256"])
-
-            # Validate binding claims
-            if claims.get("htm") != expected_method:
-                return False
-            if claims.get("htu") != expected_uri:
-                return False
-
-            # Kiểm tra freshness (iat ≤ 60s)
-            iat = claims.get("iat", 0)
-            if abs(datetime.utcnow().timestamp() - iat) > 60:
-                return False
-
-            # REPLAY PROTECTION: jti phải chưa từng thấy
-            jti = claims.get("jti")
-            if not jti:
-                return False
-
-            # SET NX: chỉ set nếu key chưa tồn tại — atomic operation
-            jti_key = f"dpop:jti:{jti}"
-            was_set = redis_client.set(jti_key, "1", ex=300, nx=True)
-            if not was_set:
-                # jti đã tồn tại → replay attack
-                return False
-
-            return True
-
-        except JWTError:
-            return False
+  // Build proof JWT with htu, htm, jti (uuid), iat, ath
+  // ... (full implementation in frontend/src/utils/dpop.js)
+}
 ```
 
-**Deployment D2 (mTLS thay thế DPoP):**  
-Trong D2 (Linux VM), mTLS east-west giữa các service thay thế hoàn toàn DPoP + Redis. Client certificate bound vào connection — replay impossible ở tầng TLS.
+**DPoP verifier Backend (backend/app/security/dpop_verifier.py):**
+```python
+# Verify htu, htm, iat freshness (≤60s), jti (Redis SET NX), ath
+jti_key = f"dpop:jti:{jti}"
+was_set = redis_client.set(jti_key, "1", ex=300, nx=True)
+if not was_set:
+    raise HTTPException(401, "DPoP proof replayed")
+```
+
+**Test replay:**
+```bash
+python3 scripts/attacks/replay_dpop_attack.py
+# Lần 1: 200 OK
+# Lần 2 (same proof): 401 "DPoP proof replayed"
+```
+
+**E-C2 — nonce reuse (50 threads):**
+```bash
+python3 scripts/evaluation/e_c2_nonce_test.py
+# 50 threads, cùng DPoP proof → 1/50 pass, 49/50 → 401 replayed
+```
+
+**Deployment D2 (mTLS thay thế DPoP):**
+Trong D2 (Linux VM), mTLS east-west giữa các service thay thế hoàn toàn DPoP + Redis.
 
 ---
 
@@ -414,66 +327,90 @@ Trong D2 (Linux VM), mTLS east-west giữa các service thay thế hoàn toàn D
 
 **Chuẩn áp dụng:** NIST SP 800-162 — Guide to ABAC
 
-Hệ thống áp dụng mô hình **deny-by-default** — mọi request đều bị từ chối trừ khi có rule explicit allow. Policy Decision Point (PDP) là OPA; Policy Enforcement Point (PEP) là Kong.
+Hệ thống áp dụng **deny-by-default** — mọi request đều bị từ chối trừ khi có rule explicit allow. Policy Decision Point (PDP) là OPA; Policy Enforcement Point (PEP) là Kong.
 
 **Kiến trúc PEP-PDP:**
 ```
-Client → Kong (PEP) → OPA (PDP)
-                  ←  allow/deny + reason
+Client → Kong (PEP) → [jwt-hardening.lua → opa-authz.lua]
+                  →   OPA (PDP): POST /v1/data/authz/allow
+                  ←   {"result": {"allow": true/false, "reason": "..."}}
          Kong → Backend (nếu allow)
+```
+
+**OPA response có trường `reason`** (frontend log ra console để debug):
+```json
+{"result": {"allow": false, "reason": "not_owner"}}
 ```
 
 **Policy authz.rego (opa/policies/authz.rego):**
 ```rego
 package authz
-
 import future.keywords.if
 import future.keywords.in
 
-# DENY-BY-DEFAULT: Mặc định từ chối tất cả
 default allow = false
 default deny_reason = "no matching rule"
 
-# Cấu trúc quyền theo RBAC → ABAC
 role_permissions := {
     "admin": {
         "GET":    ["/api/v1/users", "/api/v1/products", "/api/v1/orders"],
         "POST":   ["/api/v1/products", "/api/v1/orders"],
-        "PUT":    ["/api/v1/products"],
+        "PUT":    ["/api/v1/products", "/api/v1/orders"],
         "DELETE": ["/api/v1/products", "/api/v1/users"]
     },
     "staff": {
         "GET":  ["/api/v1/products", "/api/v1/orders"],
-        "PUT":  ["/api/v1/orders"],
-        "POST": ["/api/v1/orders"]
+        "PUT":  ["/api/v1/orders"]
     },
     "customer": {
         "GET":  ["/api/v1/products"],
-        "POST": ["/api/v1/orders"]
+        "POST": ["/api/v1/orders"],
+        "GET":  ["/api/v1/orders"]   # Chỉ order của mình (ABAC check bên dưới)
     }
 }
 
-# Rule RBAC: allow nếu role có permission
+# RBAC base rule
 allow if {
     some role in input.user.roles
     some permitted_path in role_permissions[role][input.method]
     startswith(input.path, permitted_path)
 }
 
-# Rule ABAC bổ sung: customer chỉ được xem order của chính mình (BOLA prevention)
+# ABAC: customer chỉ được xem order của chính mình (BOLA prevention)
 allow if {
     "customer" in input.user.roles
     input.method == "GET"
     startswith(input.path, "/api/v1/orders/")
-    order_id := split(input.path, "/")[4]
-    input.resource_owner_id == input.user.sub  # ownership check
+    input.resource_owner_id == input.user.sub
 }
 
-# Log reason để 100% decision explainable (Invariant I5)
+# Admin-only paths
+allow if {
+    "admin" in input.user.roles
+    startswith(input.path, "/api/v1/admin/")
+}
+
+# Webhook: yêu cầu hmac_verified claim
+allow if {
+    startswith(input.path, "/api/v1/webhooks/")
+    input.hmac_verified == true
+}
+
+# Log reason cho mọi quyết định (Invariant I5)
 deny_reason = "not_owner" if {
     "customer" in input.user.roles
     startswith(input.path, "/api/v1/orders/")
     input.resource_owner_id != input.user.sub
+}
+
+deny_reason = "admin_only" if {
+    not "admin" in input.user.roles
+    startswith(input.path, "/api/v1/admin/")
+}
+
+deny_reason = "hmac_required" if {
+    startswith(input.path, "/api/v1/webhooks/")
+    not input.hmac_verified
 }
 
 deny_reason = "insufficient_role" if {
@@ -482,62 +419,64 @@ deny_reason = "insufficient_role" if {
 }
 ```
 
-**Plugin opa-authz.lua (gateway/plugins/opa-authz.lua):**
-```lua
-local http = require "resty.http"
-local cjson = require "cjson"
-
-local OpaAuthzHandler = {}
-
-function OpaAuthzHandler:access(conf)
-  local httpc = http.new()
-
-  -- Build OPA input từ request context
-  local input = {
-    method = kong.request.get_method(),
-    path   = kong.request.get_path(),
-    user   = {
-      sub   = kong.ctx.shared.jwt_sub,
-      roles = kong.ctx.shared.jwt_roles,
-    }
-  }
-
-  -- Gọi OPA PDP
-  local res, err = httpc:request_uri(conf.opa_url .. "/v1/data/authz/allow", {
-    method  = "POST",
-    body    = cjson.encode({ input = input }),
-    headers = { ["Content-Type"] = "application/json" }
-  })
-
-  if err or not res then
-    kong.log.err("OPA unreachable: ", err)
-    return kong.response.exit(503, { message = "Authorization service unavailable" })
-  end
-
-  local result = cjson.decode(res.body)
-
-  -- Log 100% decision (Invariant I5)
-  kong.log.info("OPA decision: allow=", tostring(result.result),
-                " user=", input.user.sub,
-                " method=", input.method,
-                " path=", input.path)
-
-  if not result.result then
-    return kong.response.exit(403, { message = "Access denied by policy" })
-  end
-end
-```
-
-**Kiểm tra (Invariant I5 — E-Z1.md):**
+**Test suite (opa/tests/) — ≥50 cases:**
 ```bash
-bash scripts/evaluation/e_z1_policy_test.sh
-# Test matrix: 15 test cases (5 roles × 3 resource types)
-# Expected:
-#   - Policy pass-rate ≥ 95% (allow đúng)
-#   - Undeclared action deny = 100% (deny-by-default)
-#   - BOLA rejection = 100% (cross-user access)
-#   - 100% decisions có log với reason
+docker compose exec opa opa test opa/policies/ opa/tests/ --format json \
+  > EVIDENCE/security_scans/opa_results.json
+# Expected: pass rate ≥95%
 ```
+
+---
+
+## Lớp 4 — WAF Equivalent: Kong + OPA cho SME
+
+> **Lý do không dùng WAF riêng:** Cloudflare WAF, AWS WAF, hay ModSecurity đều có chi phí vận hành và licensing không phù hợp với SME (tổ chức nhỏ). Stack hiện tại đã tích hợp sẵn các cơ chế phòng thủ tương đương cho API workload thực tế.
+
+### Kong đóng vai trò WAF lightweight
+
+Kong API Gateway (port `:8000`/`:8443`) thực hiện các chức năng tương đương WAF:
+
+| Tính năng WAF | Cơ chế Kong | File cấu hình |
+|---|---|---|
+| Rate limiting per-IP | `rate-limit` plugin | `gateway/kong.yml` |
+| Rate limiting per-user | `rate-limit` plugin (by consumer) | `gateway/kong.yml` |
+| Block malformed JWT | `jwt-hardening.lua` (alg=none, kid injection) | `gateway/plugins/` |
+| HSTS enforcement | `hsts-header.lua` | `gateway/plugins/` |
+| TLS downgrade prevention | `ssl_protocols TLSv1.3` | `gateway/kong.conf` |
+| CORS protection | CORS plugin strict config | `gateway/kong.yml` |
+
+**Verify rate-limit hoạt động:**
+```bash
+for i in $(seq 1 15); do curl -s -o /dev/null -w "%{http_code}\n" \
+  http://localhost:8000/api/v1/products; done
+# Request thứ 11+ → 429 Too Many Requests
+```
+
+### OPA đóng vai trò Policy Enforcement
+
+OPA (port `:8181`) thực hiện các chức năng tương đương WAF policy engine:
+
+| Tính năng WAF | Cơ chế OPA | File |
+|---|---|---|
+| Block unauthenticated | `default allow = false` | `authz.rego` |
+| Block unauthorized paths | per-role path permissions | `authz.rego` |
+| BOLA/IDOR prevention | ABAC ownership check | `authz.rego` |
+| Rate limit policy | `rate_limit.rego` deny >100 req/phút | `rate_limit.rego` |
+| Admin path protection | `admin_only` rule | `authz.rego` |
+
+### Giới hạn so với WAF thực sự
+
+| Tính năng | Kong+OPA | WAF thực (Cloudflare/ModSecurity) |
+|---|---|---|
+| Deep packet inspection | ❌ Không | ✅ Có |
+| Signature-based detection | ❌ Không | ✅ Có (CVE signatures) |
+| SQL injection detection | ❌ Chỉ ở FastAPI validation | ✅ Tầng gateway |
+| Rate limiting | ✅ Per-IP, per-user | ✅ Có |
+| JWT/Auth protection | ✅ Đầy đủ | ✅ Có |
+| OWASP API Top 10 | ✅ Phủ ~80% | ✅ Phủ ~95% |
+| Chi phí | ✅ Free (open source) | ❌ $20–500/tháng |
+
+**Kết luận:** Đối với SME với ràng buộc chi phí, Kong + OPA đủ phòng thủ các attack vector phổ biến nhất trong OWASP API Top 10. Thiếu sót chính là deep packet inspection và signature-based detection — có thể bổ sung ModSecurity như module NGINX khi scale lên. Đây là đánh đổi có chủ ý và được tài liệu hóa rõ ràng.
 
 ---
 
@@ -547,12 +486,14 @@ bash scripts/evaluation/e_z1_policy_test.sh
 |---|---|---|---|
 | API1 — BOLA | OPA ownership check (`resource_owner_id == user.sub`) | AuthZ | `opa/policies/authz.rego` |
 | API2 — Broken Auth | PKCE, JWT RS256, TOTP MFA, DPoP replay protection | AuthN | `backend/app/security/` |
-| API3 — Broken Object Property Auth | OPA ABAC field-level access control | AuthZ | `authz.rego` |
-| API4 — Rate Limiting | Kong rate-limit plugin + OPA rate_limit.rego | Crypto/AuthZ | `gateway/kong.yml`, `opa/policies/rate_limit.rego` |
+| API3 — Broken Object Property Auth | Pydantic response_model DTO filter | AuthZ | `backend/app/routers/` |
+| API4 — Rate Limiting | Kong rate-limit plugin + OPA rate_limit.rego | WAF/AuthZ | `gateway/kong.yml`, `opa/policies/rate_limit.rego` |
 | API5 — Function Level AuthZ | deny-by-default OPA, explicit allow per method+path | AuthZ | `authz.rego` |
-| API7 — Server Side Request Forgery | CORS strict, internal network isolation (D2 zones) | Crypto | `gateway/plugins/hsts-header.lua` |
-| API8 — Security Misconfiguration | alg=none block, HSTS, TLS 1.3 enforce, Vault least-privilege | Crypto | `jwt-hardening.lua`, `kong.conf` |
-| API10 — Unsafe API Consumption | Input validation tại FastAPI + OPA policy | AuthZ | `backend/app/middleware/` |
+| API6 — Unrestricted Access to Sensitive Business | OPA ABAC field-level + DTO | AuthZ | `authz.rego`, routers |
+| API7 — SSRF | IP blocklist nội bộ (169.254.0.0/16, 10.0.0.0/8...) | Backend | `backend/app/middleware/` |
+| API8 — Security Misconfiguration | alg=none block, HSTS, TLS 1.3, Vault least-privilege | WAF/Crypto | `jwt-hardening.lua`, `kong.conf` |
+| API9 — Improper Inventory Management | OpenAPI schema strict, Pydantic models | Backend | `backend/app/routers/` |
+| API10 — Unsafe API Consumption | Input validation FastAPI + OPA policy | AuthZ/Backend | `backend/app/middleware/` |
 
 ---
 
@@ -564,5 +505,6 @@ bash scripts/evaluation/e_z1_policy_test.sh
 | **I2** | Tampering ciphertext | AES-256-GCM AEAD tag | 100% bị chặn | Crypto |
 | **I3** | Integrity dữ liệu | Nonce per-record, AEAD verify | Pass 100% | Crypto |
 | **I4** | AuthN + Token binding | TOTP, PKCE, DPoP/mTLS, JWT RS256 | Replay = 0 | AuthN |
-| **I5** | AuthZ explainable | OPA deny-by-default + 100% log | 100% explainable | AuthZ |
-| **I6** | Key rotation SLA | Vault Transit rotation | ≤ 10 phút | Crypto |
+| **I5** | AuthZ explainable | OPA deny-by-default + 100% log + reason | 100% explainable | AuthZ |
+| **I6** | Key rotation SLA | Vault 1.15 Transit rotation | ≤10 phút | Crypto |
+| **I7** | MFA false-accept | TOTP strict verify, no bypass | false-accept = 0% | AuthN |

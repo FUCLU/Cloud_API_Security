@@ -77,13 +77,14 @@ Khóa mã hóa được quản lý tự động và thay mới định kỳ.
 | **Identity Provider** | Keycloak 24.0 | Quản lý đăng nhập, OTP, cấp token |
 | **Authorization** | OPA / Rego 0.65.0 | Quyết định ai được làm gì |
 | **Key Management** | HashiCorp Vault 1.15 | Quản lý và tự động thay khóa mã hóa |
-| **Replay Protection** | Redis | Ghi nhớ token đã dùng — chặn dùng lại |
+| **Replay Protection** | Redis | Ghi nhớ DPoP jti đã dùng — chặn replay |
 | **Observability** | Grafana + Loki + Promtail | Ghi log mọi thứ, cảnh báo khi có bất thường |
 | **CI/CD** | GitHub Actions | Tự động kiểm tra bảo mật mỗi lần cập nhật code |
 
 ---
 
 ## Kiến trúc hệ thống
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  CI/CD Pipeline                                                         │
@@ -129,11 +130,8 @@ Khóa mã hóa được quản lý tự động và thay mới định kỳ.
 │  Monitoring & Observability                                             │
 │  Promtail  ──►  Loki  ──►  Grafana                                      │
 └─────────────────────────────────────────────────────────────────────────┘
-
-  Legend:
-  ──►  Data flow                        ◄──►  Authentication (Keycloak ↔ Kong)
-  ◄──► Authorization (OPA ↔ Kong)       yellow = Key Management
 ```
+
 Sơ đồ đầy đủ: [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
 
 **Port mapping Docker (D1):**
@@ -158,20 +156,21 @@ Sơ đồ đầy đủ: [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
 
 - **Truyền tải:** TLS 1.3, ciphersuites thu gọn, 0-RTT tắt, HSTS header bắt buộc
 - **Lưu trữ:** AES-256-GCM (AEAD), nonce `os.urandom(12)` per-record, envelope encryption DEK/KEK qua HashiCorp Vault Transit Engine
-- **Chữ ký:** Ed25519 / RS256 (Keycloak), toàn bộ tham số được tài liệu hóa đầy đủ
+- **Chữ ký:** RS256 (Keycloak), toàn bộ tham số được tài liệu hóa đầy đủ
 
 ### Lớp 2 — AuthN (Xác thực)
 
-- **Người dùng:** WebAuthn/FIDO2 (primary), TOTP fallback (không có bypass)
-- **Flow:** Authorization Code + PKCE (public clients), Client Credentials (S2S)
-- **Session:** cookie `Secure` + `HttpOnly` + `SameSite`, refresh token rotation + reuse-detection
-- **S2S:** mTLS east-west (D2), SPIFFE/SPIRE (optional)
+- **Người dùng:** TOTP MFA bắt buộc cho admin (không có bypass)
+- **Flow:** Authorization Code + PKCE (public clients / SPA), Client Credentials (S2S)
+- **Token binding:** DPoP (RFC 9449) — ephemeral ES256 keypair, jti lưu Redis SET NX chống replay
+- **Session:** refresh token rotation + reuse-detection (Keycloak)
+- **S2S:** mTLS east-west (D2), self-signed CA
 
 ### Lớp 3 — AuthZ (Cấp quyền)
 
 - **Mô hình:** deny-by-default → least-privilege → RBAC → ABAC (OPA/Rego)
-- **Thi hành:** PEP tại Kong gateway, PDP tại OPA — log reason cho mọi quyết định (100%)
-- **Token:** JWT pin `alg=RS256`, kiểm soát `kid`, TTL ngắn, DPoP/mTLS-bound (PoP)
+- **Thi hành:** PEP tại Kong gateway (`opa-authz.lua`), PDP tại OPA — log reason cho mọi quyết định (100%)
+- **Token:** JWT pin `alg=RS256`, kiểm soát `kid`, TTL 15 phút, DPoP-bound
 
 Chi tiết đầy đủ: [`CRYPTO_SOLUTION.md`](CRYPTO_SOLUTION.md)
 
@@ -187,6 +186,7 @@ Chi tiết đầy đủ: [`CRYPTO_SOLUTION.md`](CRYPTO_SOLUTION.md)
 | **I4** | AuthN chống phishing; PoP token bound; replay = 0 | Replay = 0 | [E-N2](EVAL/E-N2.md) |
 | **I5** | Quyết định AuthZ giải thích được từ log/policy | 100% explainable | [E-Z1](EVAL/E-Z1.md) |
 | **I6** | Key rotation ≤ 10 phút; blast-radius ≤ 24h | SLA đạt | [E-X1](EVAL/E-X1.md), [E-X2](EVAL/E-X2.md) |
+| **I7** | MFA false-accept = 0 | false-accept = 0% | [E-N1](EVAL/E-N1.md) |
 
 Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 
@@ -195,124 +195,245 @@ Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 ## Cấu trúc thư mục
 
 ```
-.
-├── ARCH/
-│   ├── ARCH.drawio                  # Sơ đồ kiến trúc (draw.io)
-│   └── ARCH.pdf                     # Export kiến trúc + invariants I1–I6
-├── CRYPTO_SOLUTION.md               # Giải pháp mật mã 3 lớp
-├── RESULTS.md                       # Bảng metric + kết luận invariants đạt/chưa
-├── RUNBOOK.md                       # Hướng dẫn chạy từ máy sạch
-├── docker-compose.yml               # D1: toàn bộ stack 1 lệnh
+Cloud_Api_Security/
+├── .env.example                         # Template biến môi trường (copy → .env)
+├── .gitignore                           # Loại trừ *.env, *.key, *.pem, certs/
+├── docker-compose.yml                   # D1: toàn bộ stack 11 services, 1 lệnh
+├── README.md
+├── RUNBOOK.md                           # Hướng dẫn chạy từ máy sạch (≤5 phút)
+├── AIM.md                               # Assets · Identity · SMART goals
+├── CRYPTO_SOLUTION.md                   # Giải pháp mật mã 3 lớp + WAF
+├── REFERENCES.md                        # 13 nguồn chính thức + 5 công cụ
+├── RESULTS.md                           # Bảng 9 metrics + kết luận I1–I7
 │
-├── frontend/                        # React + Vite SPA
+├── ARCH/
+│   ├── ARCH.drawio                      # Sơ đồ kiến trúc (draw.io) — cần tạo
+│   └── ARCH.pdf                         # Export kiến trúc + invariants I1–I7
+│
+├── frontend/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   ├── package.json
-│   ├── index.html                   # Entry point Vite
+│   ├── package-lock.json
+│   ├── index.html                       # Entry point Vite
 │   └── src/
+│       ├── main.jsx                     # Entry point React
+│       ├── App.jsx                      # Router + route definitions (+ /callback)
+│       ├── logo.png
+│       │
+│       ├── auth/                        # Keycloak PKCE integration
+│       │   ├── AuthProvider.jsx         # Context: token, login, logout, refresh tự động
+│       │   ├── PrivateRoute.jsx         # Route guard theo role
+│       │   └── keycloak.js              # PKCE: code_verifier, redirect, callback handler
+│       │
+│       ├── api/                         # API call functions (dùng apiFetch bên dưới)
+│       │   ├── index.js                 # Re-export tất cả API modules
+│       │   ├── orders.js                # CRUD orders endpoints
+│       │   ├── products.js              # CRUD products endpoints
+│       │   └── users.js                 # CRUD users endpoints
+│       │
+│       ├── utils/                       # Security utilities
+│       │   ├── dpop.js                  # DPoP proof generator (Web Crypto ES256, RFC 9449)
+│       │   └── apiFetch.js              # Fetch wrapper: auto Authorization + DPoP header
+│       │
+│       ├── hooks/                       # Custom React hooks
+│       │   ├── useAuth.js               # Hook dùng AuthProvider context
+│       │   ├── useOrders.js             # Hook fetch + state orders
+│       │   └── useProducts.js           # Hook fetch + state products
+│       │
+│       ├── components/
+│       │   ├── shared/                  # Reusable components
+│       │   │   ├── LoadingScreen.jsx    # Loading indicator toàn trang
+│       │   │   ├── OrderRow.jsx         # Row component cho bảng đơn hàng
+│       │   │   └── ProductCard.jsx      # Card component sản phẩm
+│       │   └── ui/                      # Base UI components
+│       │       ├── Badge.jsx            # Badge trạng thái (pending, done...)
+│       │       ├── Drawer.jsx           # Slide-in drawer chi tiết
+│       │       └── Modal.jsx            # Modal dialog (thêm/sửa/xoá)
+│       │
 │       ├── context/
-│       │   └── CartContext.jsx      # Shared cart state (React Context)
+│       │   └── CartContext.jsx          # Shared cart state (React Context)
+│       │
 │       ├── layouts/
-│       │   ├── AdminLayout.jsx      # Sidebar + Outlet cho Admin
-│       │   ├── StaffLayout.jsx      # Sidebar + Outlet cho Staff
-│       │   └── CustomerLayout.jsx   # Navbar + Outlet cho Customer
+│       │   ├── AdminLayout.jsx          # Sidebar + Outlet cho Admin
+│       │   ├── StaffLayout.jsx          # Sidebar + Outlet cho Staff
+│       │   └── CustomerLayout.jsx       # Navbar + Outlet cho Customer
+│       │
 │       ├── pages/
 │       │   ├── auth/
-│       │   │   └── Login.jsx        # Đăng nhập 2 bước (email + OTP)
+│       │   │   └── Login.jsx            # Redirect Keycloak PKCE + OTP step
 │       │   ├── admin/
-│       │   │   ├── Dashboard.jsx    # KPI, biểu đồ, audit log
-│       │   │   ├── Orders.jsx       # Quản lý đơn hàng
-│       │   │   ├── Products.jsx     # CRUD sản phẩm
-│       │   │   ├── UserManagement.jsx  # Quản lý user + khoá tài khoản
-│       │   │   └── SystemSettings.jsx  # Toggle bảo mật, Vault, OPA policy
+│       │   │   ├── Dashboard.jsx        # KPI, biểu đồ doanh thu, Security Audit Log
+│       │   │   ├── Orders.jsx           # Quản lý đơn hàng (filter + drawer)
+│       │   │   ├── Products.jsx         # CRUD sản phẩm (modal)
+│       │   │   ├── UserManagement.jsx   # Quản lý user + khoá/mở khoá tài khoản
+│       │   │   └── SystemSettings.jsx   # Toggle TLS/DPoP/MFA/WAF, Vault log, OPA viewer
 │       │   ├── staff/
-│       │   │   ├── Dashboard.jsx    # Đơn cần xử lý, tồn kho sắp hết
-│       │   │   ├── Orders.jsx       # Cập nhật trạng thái đơn hàng
-│       │   │   └── Products.jsx     # Cập nhật tồn kho (không xoá)
+│       │   │   ├── Dashboard.jsx        # Đơn cần xử lý, tồn kho sắp hết
+│       │   │   ├── Orders.jsx           # Cập nhật trạng thái đơn hàng
+│       │   │   └── Products.jsx         # Cập nhật tồn kho (không xoá)
 │       │   └── customer/
-│       │       ├── ProductCatalog.jsx  # Danh sách sản phẩm + giỏ hàng
-│       │       ├── MyOrders.jsx        # Đơn hàng + đặt hàng + thanh toán
-│       │       └── Profile.jsx         # Thông tin cá nhân + đổi mật khẩu
-│       ├── styles/
-│       │   ├── global.css           # Design system dùng chung toàn app
-│       │   └── login.css            # CSS riêng trang Login
-│       ├── App.jsx                  # Router + route definitions
-│       └── main.jsx                 # Entry point React
+│       │       ├── ProductCatalog.jsx   # Danh sách sản phẩm + giỏ hàng
+│       │       ├── MyOrders.jsx         # Đơn hàng + đặt mới + thanh toán
+│       │       └── Profile.jsx          # Thông tin cá nhân + đổi mật khẩu
+│       │
+│       └── styles/
+│           ├── global.css               # Design system dùng chung toàn app
+│           └── login.css                # CSS riêng trang Login
 │
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py
-│       ├── api/v1/                  # FastAPI endpoints: users, products, orders
-│       ├── core/                    # config.py, security.py
-│       ├── db/                      # database.py, models.py, seed_data.py
-│       ├── middleware/              # auth_middleware.py, logging_middleware.py
-│       ├── security/                # aead_encryption.py, dpop_verifier.py,
-│       │                            # jwt_verify.py, totp_verify.py
-│       ├── services/                # order_service.py, product_service.py, user_service.py
-│       └── tests/                   # test_orders.py, test_security.py, test_users.py
+│       ├── main.py                      # FastAPI app init, CORS, middleware mount
+│       ├── api/v1/                      # REST endpoints
+│       │   ├── orders.py                # GET/POST/PUT/DELETE /api/v1/orders
+│       │   ├── products.py              # GET/POST/PUT/DELETE /api/v1/products
+│       │   └── users.py                 # GET/POST/PUT/DELETE /api/v1/users
+│       ├── core/
+│       │   ├── config.py                # Env vars, settings
+│       │   └── security.py              # JWT decode helpers
+│       ├── db/
+│       │   ├── database.py              # SQLAlchemy engine + session
+│       │   ├── models.py                # ORM: User, Product, Order (email/phone encrypted)
+│       │   └── seed_data.py             # Insert 50 synthetic records mỗi bảng
+│       ├── middleware/
+│       │   ├── auth_middleware.py       # JWT verify + DPoP verify per-request
+│       │   └── logging_middleware.py    # Structured JSON log + correlation_id
+│       ├── security/
+│       │   ├── aead_encryption.py       # AES-256-GCM encrypt/decrypt (Vault DEK)
+│       │   ├── dpop_verifier.py         # DPoP proof verify + Redis jti SET NX
+│       │   ├── jwt_verify.py            # RS256 verify, alg pin, kid check
+│       │   └── totp_verify.py           # TOTP verify (pyotp), false-accept=0
+│       ├── services/
+│       │   ├── order_service.py         # Business logic + BOLA check (token.sub vs owner)
+│       │   ├── product_service.py       # Business logic sản phẩm
+│       │   └── user_service.py          # Business logic user + SSRF block
+│       └── tests/
+│           ├── test_orders.py
+│           ├── test_security.py
+│           └── test_users.py
 │
 ├── gateway/
-│   ├── kong.conf
-│   ├── kong.yml                     # Kong declarative config
-│   ├── deck/kong-declarative.yml
-│   └── plugins/                     # hsts-header.lua, jwt-hardening.lua, opa-authz.lua
+│   ├── kong.conf                        # TLS 1.3, ssl_session_tickets off
+│   ├── kong.yml                         # Declarative config: routes, plugins, services
+│   ├── deck/
+│   │   └── kong-declarative.yml
+│   └── plugins/
+│       ├── hsts-header.lua              # Inject HSTS header
+│       ├── jwt-hardening.lua            # Block alg=none, kid whitelist
+│       └── opa-authz.lua                # Kong → OPA HTTP API (PEP→PDP)
 │
-├── idp/keycloak/                    # realm-export.json, clients.json, users.json
+├── idp/keycloak/
+│   ├── realm-export.json                # Realm "lab": PKCE, TOTP, rotating refresh
+│   ├── clients.json                     # spa-client (public) + backend-client (confidential)
+│   └── users.json                       # 3 test users: admin, staff, customer
 │
 ├── opa/
-│   ├── config/opa-config.yaml
-│   ├── policies/                    # authz.rego, admin.rego, rate_limit.rego
-│   └── tests/                       # authz_test.rego, admin_test.rego, rate_test.rego
+│   ├── config/
+│   │   └── opa-config.yaml              # OPA server config + decision log
+│   ├── policies/
+│   │   ├── authz.rego                   # RBAC + ABAC deny-by-default + reason field
+│   │   ├── admin.rego                   # /admin/* → role=admin only
+│   │   └── rate_limit.rego              # Deny nếu request_count > 100/phút
+│   └── tests/
+│       ├── authz_test.rego              # ≥25 test cases RBAC + BOLA
+│       ├── admin_test.rego              # Admin path protection cases
+│       └── rate_test.rego               # Rate limit policy cases
 │
 ├── vault/
-│   ├── init/                        # vault-init.sh, enable-transit.sh
-│   └── policies/dek-policy.hcl
+│   ├── init/
+│   │   ├── vault-init.sh                # Bootstrap: enable transit, tạo DEK key
+│   │   └── enable-transit.sh            # Enable transit engine + apply dek-policy
+│   └── policies/
+│       └── dek-policy.hcl               # Least-privilege: chỉ encrypt/decrypt DEK
 │
 ├── observability/
 │   ├── grafana/
-│   │   ├── dashboards/api-security-dashboard.json
-│   │   └── provisioning/
-│   ├── loki/loki-config.yml
-│   └── promtail/promtail-config.yml
+│   │   ├── dashboards/
+│   │   │   └── api-security-dashboard.json  # Request count, auth failures, OPA denies
+│   │   └── provisioning/                # Grafana datasource + dashboard auto-provision
+│   ├── loki/
+│   │   └── loki-config.yml
+│   └── promtail/
+│       └── promtail-config.yml          # Scrape Kong + FastAPI + OPA decision logs
 │
 ├── DEPLOY/
-│   ├── D1/Runbook.md                # Docker Compose local
-│   └── D2/                          # Linux VM + mTLS
-│       ├── nginx.conf               # NGINX reverse proxy (thay Kong)
-│       ├── iptables.sh              # Zone firewall: DMZ / Private / Mgmt
-│       ├── Runbook.md
-│       └── certs/                   # ca.crt, svc.crt, svc.key
+│   ├── D1/
+│   │   └── Runbook.md                   # Docker Compose local (8 sections)
+│   └── D2/
+│       ├── nginx.conf                   # NGINX mTLS gateway (thay Kong)
+│       ├── iptables.sh                  # 3-zone firewall: DMZ / Private / Mgmt
+│       ├── Runbook.md                   # VM setup, CA bootstrap, cert rotation
+│       └── certs/
+│           ├── ca.crt                   # Self-signed CA (RSA 4096, 365 ngày)
+│           ├── svc.crt                  # Service cert (RSA 2048, 90 ngày)
+│           └── svc.key
 │
-├── EVAL/                            # E-C1 → E-Z2: thủ tục đo từng invariant
+├── EVAL/
+│   ├── E-C1.md                          # I1 — TLS plaintext capture
+│   ├── E-C2.md                          # I2 — DPoP nonce reuse (50 threads)
+│   ├── E-C3.md                          # I2/I3 — AEAD tamper test
+│   ├── E-N1.md                          # I3/I7 — TOTP AuthN (100 tests, false-accept=0)
+│   ├── E-N2.md                          # I4 — mTLS cert revoke + rotate
+│   ├── E-X1.md                          # I6 — Vault key rotation SLA ≤10 phút
+│   ├── E-X2.md                          # I6 — OPA explainability (100% reason)
+│   ├── E-Z1.md                          # I5 — OPA policy test suite ≥50 cases
+│   └── E-Z2.md                          # I4 — Token hardening 3 vectors
 │
 ├── EVIDENCE/
-│   ├── attack_results/
-│   ├── captures/                    # http_capture.pcap, tls_capture.pcap
-│   ├── logs/                        # auth.log, kong.log, opa.log
-│   ├── screenshots/
+│   ├── attack_results/                  # logs từ bola_attack, alg_none, replay_dpop
+│   ├── captures/                        # http_capture.pcap, tls_capture.pcap
+│   ├── logs/                            # auth.log, kong.log, opa.log, opa_decisions.json
+│   ├── screenshots/                     # Wireshark TLS vs HTTP, Grafana alerts
 │   └── security_scans/
-│       ├── bandit_report.json
-│       ├── zap_report.html
-│       └── restler_results/
+│       ├── bandit_report.json           # SAST output
+│       ├── zap_report.html              # DAST output (chạy thực, không chỉ skeleton)
+│       ├── opa_results.json             # OPA test JSON (≥50 cases, ≥95% pass) — cần tạo
+│       ├── sca_report.txt               # pip-audit SCA output — cần tạo
+│       └── restler_results/             # RESTler API fuzzing output
 │
 ├── scripts/
-│   ├── attacks/                     # bola_attack.py, replay_dpop_attack.py,
-│   │                                # alg_none_attack.py, nonce_reuse_test.py
-│   ├── evaluation/                  # e_c1_tls_capture.sh, e_c2_nonce_test.py,
-│   │                                # e_c3_aead_integrity.py, e_n1_totp_test.py,
-│   │                                # e_x1_rotation_test.sh, e_z1_policy_test.sh,
-│   │                                # e_z2_token_hardening.sh
-│   └── security_testing/            # run_dast.sh, run_fuzz.sh, run_sast.sh
+│   ├── attacks/
+│   │   ├── alg_none_attack.py           # Vector 1: JWT alg=none bypass
+│   │   ├── bola_attack.py               # BOLA: user A truy cập resource user B
+│   │   ├── nonce_reuse_test.py          # 50 threads cùng DPoP proof
+│   │   └── replay_dpop_attack.py        # DPoP replay attack
+│   ├── evaluation/
+│   │   ├── e_c1_tls_capture.sh          # tcpdump + Wireshark verify
+│   │   ├── e_c2_nonce_test.py           # 50 threads nonce reuse
+│   │   ├── e_c3_aead_integrity.py       # Flip tag byte → InvalidTag
+│   │   ├── e_n1_totp_test.py            # 100 TOTP tests
+│   │   ├── e_x1_rotation_test.sh        # Vault rotate + timestamp
+│   │   ├── e_z1_policy_test.sh          # OPA test suite JSON export
+│   │   └── e_z2_token_hardening.sh      # 3 token attack vectors
+│   └── security_testing/
+│       ├── run_dast.sh                  # OWASP ZAP scan
+│       ├── run_fuzz.sh                  # RESTler fuzzing
+│       └── run_sast.sh                  # Bandit SAST
 │
-└── tests/
-    ├── integration/                 # test_api_flow.py, test_auth_flow.py, test_policy_flow.py
-    ├── security/                    # test_replay.py, test_token.py
-    └── security_scans/
-        ├── dast/zap_scan.sh
-        ├── fuzz/restler_config.json
-        └── sast/bandit.sh
+├── tests/
+│   ├── integration/
+│   │   ├── test_api_flow.py
+│   │   ├── test_auth_flow.py
+│   │   └── test_policy_flow.py
+│   ├── security/
+│   │   ├── test_replay.py
+│   │   └── test_token.py
+│   └── security_scans/
+│       ├── dast/
+│       │   └── zap_scan.sh
+│       ├── fuzz/
+│       │   └── restler_config.json
+│       └── sast/
+│           └── bandit.sh
+│
+└── vault/
+    ├── init/
+    │   ├── vault-init.sh
+    │   └── enable-transit.sh
+    └── policies/
+        └── dek-policy.hcl
 ```
 
 ---
@@ -350,21 +471,18 @@ docker compose exec backend python -m app.db.seed_data
 # Bước 5 — Kiểm tra nhanh
 curl http://localhost:8000/api/v1/products   # qua Kong → 200 OK
 curl http://localhost:9000/docs              # FastAPI Swagger UI
+open http://localhost:5173                   # Frontend
 ```
 
 ---
 
 ## 🖥 Hướng dẫn Frontend
-![alt text](image.png)
+
 ### Chạy development (standalone)
 
 ```bash
 cd frontend
-
-# Cài dependencies
 npm install
-
-# Chạy dev server
 npm run dev
 # → http://localhost:5173
 ```
@@ -381,7 +499,8 @@ npm run preview      # preview bản build local
 
 | URL | Trang | Role |
 |---|---|---|
-| `/login` | Đăng nhập 2 bước | Tất cả |
+| `/login` | Đăng nhập — redirect Keycloak PKCE | Tất cả |
+| `/callback` | Keycloak PKCE callback handler | Tất cả |
 | `/admin/dashboard` | Dashboard tổng quan | Admin |
 | `/admin/orders` | Quản lý đơn hàng | Admin |
 | `/admin/products` | Quản lý sản phẩm (CRUD) | Admin |
@@ -444,7 +563,7 @@ npm run preview      # preview bản build local
 | 🌐 Frontend | [`http://localhost:5173`](http://localhost:5173) | React SPA — giao diện chính |
 | 🌐 FastAPI (Backend) | [`http://localhost:9000/docs`](http://localhost:9000/docs) | Swagger UI, thử API trực tiếp (debug only) |
 | ⚡ Kong API Gateway | [`http://localhost:8000/api`](http://localhost:8000/api) | Entry point chính cho mọi request |
-| 🔑 Keycloak Admin | [`http://localhost:8081`](http://localhost:8081) | Quản lý realm, user, token |
+| 🔑 Keycloak Admin | [`http://localhost:8081`](http://localhost:8081) | Quản lý realm **lab**, user, token |
 | 📋 OPA | [`http://localhost:8181`](http://localhost:8181) | Policy engine, decision log |
 | 🔐 Vault UI | [`http://localhost:8200`](http://localhost:8200) | KMS, quản lý KEK/DEK |
 | 📊 Grafana | [`http://localhost:3000`](http://localhost:3000) | Dashboard bảo mật, log stream |
@@ -454,14 +573,14 @@ npm run preview      # preview bản build local
 ## Lấy token và gọi API có auth
 
 ```bash
-# Lấy access token từ Keycloak (Client Credentials flow)
+# Lấy access token từ Keycloak — realm=lab
 TOKEN=$(curl -s -X POST \
-  http://localhost:8081/realms/apirealm/protocol/openid-connect/token \
+  http://localhost:8081/realms/lab/protocol/openid-connect/token \
   -d "client_id=backend-client" \
   -d "client_secret=<secret-from-keycloak>" \
   -d "grant_type=client_credentials" | jq -r '.access_token')
 
-# Gọi endpoint cần auth qua Kong (đường đi đúng — qua JWT verify + OPA)
+# Gọi endpoint cần auth qua Kong (đường đi đúng — JWT verify + OPA)
 curl -i -H "Authorization: Bearer $TOKEN" \
   http://localhost:8000/api/v1/users
 
@@ -482,7 +601,7 @@ Chi tiết đầy đủ: [`DEPLOY/D1/Runbook.md`](DEPLOY/D1/Runbook.md)
 # Unit tests (backend)
 docker compose exec backend pytest tests/ -v
 
-# OPA policy tests
+# OPA policy tests (≥50 cases, pass rate ≥95%)
 docker compose exec opa opa test /policies /tests -v
 ```
 
@@ -500,27 +619,28 @@ python tests/integration/test_policy_flow.py
 python scripts/attacks/alg_none_attack.py       # JWT alg=none bypass
 python scripts/attacks/bola_attack.py           # BOLA / IDOR
 python scripts/attacks/replay_dpop_attack.py    # DPoP replay
-python scripts/attacks/nonce_reuse_test.py      # Nonce reuse
+python scripts/attacks/nonce_reuse_test.py      # DPoP nonce reuse (50 threads)
 ```
 
 ### Evaluation scripts (theo invariants)
 
 ```bash
 bash   scripts/evaluation/e_c1_tls_capture.sh        # I1 — TLS plaintext check
-python scripts/evaluation/e_c2_nonce_test.py         # I2 — nonce uniqueness
+python scripts/evaluation/e_c2_nonce_test.py         # I2 — DPoP nonce reuse
 python scripts/evaluation/e_c3_aead_integrity.py     # I2/I3 — AEAD tamper
-python scripts/evaluation/e_n1_totp_test.py          # I3 — TOTP / AuthN
-bash   scripts/evaluation/e_x1_rotation_test.sh      # I6 — Key rotation SLA
-bash   scripts/evaluation/e_z1_policy_test.sh        # I5 — OPA decision log
-bash   scripts/evaluation/e_z2_token_hardening.sh    # I4 — Token binding
+python scripts/evaluation/e_n1_totp_test.py          # I3/I7 — TOTP 100 tests
+bash   scripts/evaluation/e_x1_rotation_test.sh      # I6 — Key rotation SLA ≤10 phút
+bash   scripts/evaluation/e_z1_policy_test.sh        # I5 — OPA decision log ≥95%
+bash   scripts/evaluation/e_z2_token_hardening.sh    # I4 — Token binding 3 vectors
 ```
 
-### SAST / DAST / Fuzzing
+### SAST / DAST / Fuzzing / SCA
 
 ```bash
 bash scripts/security_testing/run_sast.sh    # Bandit → EVIDENCE/security_scans/bandit_report.json
 bash scripts/security_testing/run_dast.sh    # OWASP ZAP → zap_report.html
 bash scripts/security_testing/run_fuzz.sh    # RESTler → restler_results/
+pip-audit -r backend/requirements.txt -o EVIDENCE/security_scans/sca_report.txt
 ```
 
 ---
@@ -537,17 +657,10 @@ Deployment D2 chạy trên VM Ubuntu 22.04 với phân vùng mạng 3 zone và m
 
 ```bash
 cd DEPLOY/D2
-
-# Áp dụng firewall rules phân zone
 chmod +x iptables.sh
 sudo bash iptables.sh
-
-# Khởi động NGINX gateway với cert mTLS
 nginx -c $(pwd)/nginx.conf
 ```
-
-- Certificates: `DEPLOY/D2/certs/ca.crt`, `svc.crt`, `svc.key`
-- mTLS thay thế hoàn toàn DPoP+Redis cho S2S authentication
 
 Chi tiết đầy đủ: [`DEPLOY/D2/Runbook.md`](DEPLOY/D2/Runbook.md)
 
@@ -561,7 +674,7 @@ GitHub Actions tự động chạy khi push lên `main` và `dev`:
 |---|---|---|
 | **SAST** | Bandit (Python) | `EVIDENCE/security_scans/bandit_report.json` |
 | **Secrets scan** | detect-secrets, GitLeaks | Fail build nếu phát hiện secret |
-| **SCA** | Snyk dependency audit | Báo cáo CVE trong dependencies |
+| **SCA** | pip-audit | `EVIDENCE/security_scans/sca_report.txt` |
 | **DAST** | OWASP ZAP (merge → main) | `EVIDENCE/security_scans/zap_report.html` |
 | **Fuzzing** | RESTler | `EVIDENCE/security_scans/restler_results/` |
 | **Artifact signing** | cosign | Container image signed trước khi deploy |
@@ -572,9 +685,9 @@ GitHub Actions tự động chạy khi push lên `main` và `dev`:
 
 | Thành viên | MSSV | Phụ trách |
 |---|---|---|
-| Lưu Hồng Phúc | 24521382 | |
-| Phan Thái Hưng | 24520624 | |
-| Võ Tưởng Tuấn Kiệt | 24520919 | |
+| Lưu Hồng Phúc | 24521382 | Docker Compose · Kong JWT/TLS/WAF · DPoP backend · Frontend PKCE+DPoP · mTLS D2 · ARCH · RUNBOOK |
+| Phan Thái Hưng | 24520624 | FastAPI CRUD · Keycloak realm lab · Postgres AEAD · BOLA · Webhook HMAC · CORS · DAST ZAP |
+| Võ Tưởng Tuấn Kiệt | 24520919 | OPA RBAC/ABAC · Grafana/Loki · Vault rotation · Eval E-C2/E-Z1/E-X1/E-X2 · RESTler fuzzing |
 
 ---
 

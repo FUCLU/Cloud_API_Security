@@ -1,8 +1,17 @@
+networks:
+  edge-net:       # Kong ↔ Frontend ↔ Keycloak
+  internal-net:   # Backend ↔ OPA ↔ Vault ↔ Postgres ↔ Redis
+  obs-net:        # Loki ↔ Promtail ↔ Grafana
+
+volumes:
+  postgres_data:
+  grafana_data:
+
 services:
 
-# Database
+  # DATABASE
   postgres:
-    image: postgres:15
+    image: postgres:16
     container_name: api-postgres
     restart: always
     environment:
@@ -13,49 +22,111 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d cloudapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-# Backend - FastAPI
+  # REPLAY PROTECTION
+  redis:
+    image: redis:7
+    container_name: api-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SECRET MANAGER (dev mode)
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: vault
+    restart: always
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # POLICY ENGINE
+  opa:
+    image: openpolicyagent/opa:0.65.0
+    container_name: opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--config-file=/config/opa-config.yaml"
+      - "--set=decision_logs.console=true"
+      - "--set=decision_logs.plugin=print"
+      - "/policies"
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./opa/config:/config
+      - ./opa/policies:/policies
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # BACKEND — FastAPI
   backend:
     build:
       context: ./backend
     container_name: api-backend
+    restart: always
     depends_on:
-      - postgres
-      - opa
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
     ports:
-    - "9002:8001"
+      - "9000:9000"
     environment:
       DATABASE_URL: postgresql://admin:admin123@postgres:5432/cloudapi
       OPA_URL: http://opa:8181
       VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+      REDIS_URL: redis://redis:6379
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
-# Frontend - React 
-
-# API Gateway
-  kong:
-    image: kong:3.6
-    container_name: api-gateway
-    restart: always
-    depends_on:
-      - backend
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_ADMIN_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_ERROR_LOG: /dev/stderr
-    ports:
-      - "8000:8000"
-      - "8001:8001"
-    volumes:
-      - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
-      - ./gateway/plugins:/usr/local/kong/plugins
-
-# Indentity provider
+  # IDENTITY PROVIDER
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: keycloak
+    restart: always
     command: start-dev --import-realm
     ports:
       - "8081:8080"
@@ -64,57 +135,130 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     volumes:
       - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    networks:
+      - edge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/realms/lab || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
-# Policy engine
-  opa:
-    image: openpolicyagent/opa:latest
-    container_name: opa
-    command:
-      - "run"
-      - "--server"
-      - "--addr=0.0.0.0:8181"
-      - "--config-file=/config/opa-config.yaml"
-    ports:
-      - "8181:8181"
-    volumes:
-      - ./opa/config:/config
-      - ./opa/policies:/policies
-
-# Secret manager (dev mode)
-  vault:
-    image: hashicorp/vault:1.15
-    container_name: vault
-    ports:
-      - "8200:8200"
+  # API GATEWAY
+  kong:
+    image: kong:3.6
+    container_name: api-gateway
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: root
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PLUGINS: bundled,jwt-hardening,hsts-header,opa-authz
+      KONG_LUA_PACKAGE_PATH: /usr/local/kong/plugins/?.lua;;
+    ports:
+      - "8000:8000"   # Proxy (HTTP)
+      - "8443:8443"   # Proxy (HTTPS)
+      - "8001:8001"   # Admin API (nội bộ debug)
+    volumes:
+      - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
+      - ./gateway/plugins:/usr/local/kong/plugins
+    networks:
+      - edge-net
+      - internal-net
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-# Observability 
+  # FRONTEND — React + Vite
+  frontend:
+    build:
+      context: ./frontend
+    container_name: api-frontend
+    restart: always
+    depends_on:
+      kong:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_KEYCLOAK_URL=http://localhost:8081
+      - VITE_KONG_URL=http://localhost:8000
+      - VITE_REALM=lab
+      - VITE_CLIENT_ID=spa-client
+    networks:
+      - edge-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OBSERVABILITY
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.0
     container_name: loki
+    restart: always
     ports:
       - "3100:3100"
     volumes:
       - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml
     command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - obs-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.0
     container_name: promtail
+    restart: always
+    depends_on:
+      loki:
+        condition: service_healthy
     volumes:
       - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml
       - ./EVIDENCE/logs:/logs
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     command: -config.file=/etc/promtail/config.yml
+    networks:
+      - obs-net
+      - internal-net
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.0.0
     container_name: grafana
+    restart: always
+    depends_on:
+      loki:
+        condition: service_healthy
     ports:
       - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
+      - grafana_data:/var/lib/grafana
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
-
-volumes:
-  postgres_data:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - obs-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
