@@ -1,4 +1,17 @@
-## NT219.Q21.ANTT - MẬT MÃ HỌC
+# NT219.Q21.ANTT - MẬT MÃ HỌC
+
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Kong](https://img.shields.io/badge/Kong-3.6-003459?logo=kong&logoColor=white)
+![Keycloak](https://img.shields.io/badge/Keycloak-24.0-4D4D4D?logo=keycloak&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+![Vault](https://img.shields.io/badge/Vault-1.15-FFEC6E?logo=vault&logoColor=black)
+![Grafana](https://img.shields.io/badge/Grafana-10-F46800?logo=grafana&logoColor=white)
+![OPA](https://img.shields.io/badge/OPA-0.65-7D9FC2?logoColor=white)
 
 **Tên đề tài:** Cloud API-Based Network Application Security for Small Company Services
 
@@ -10,6 +23,7 @@
 - [Cấu trúc thư mục](#cấu-trúc-thư-mục)
 - [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
 - [Quick Start](#-quick-start)
+- [Hướng dẫn Frontend](#-hướng-dẫn-frontend)
 - [Địa chỉ truy cập](#địa-chỉ-truy-cập-sau-khi-stack-chạy)
 - [Xác thực và gọi API](#lấy-token-và-gọi-api-có-auth)
 - [Chạy kiểm thử](#chạy-kiểm-thử)
@@ -22,89 +36,111 @@
 
 ## Tổng quan
 
-Dự án xây dựng một hệ thống API security hoàn chỉnh, bao gồm:
+Hãy tưởng tượng bạn đang xây dựng một ứng dụng web cho công ty nhỏ — có trang
+quản lý đơn hàng, thông tin khách hàng, dữ liệu nội bộ. Ứng dụng này giao tiếp
+qua API, nghĩa là mọi thao tác (đăng nhập, xem đơn hàng, chỉnh sửa sản phẩm)
+đều là các request gửi đi và nhận về.
 
-| Thành phần | Công nghệ | Vai trò |
+Vấn đề là: **API rất dễ bị tấn công nếu không được bảo vệ đúng cách.**
+
+Kẻ tấn công có thể:
+- Giả mạo token đăng nhập để truy cập tài khoản người khác
+- Xem đơn hàng của khách hàng khác chỉ bằng cách đổi một con số trong URL
+- Đánh cắp token rồi dùng lại mãi vì token không hết hạn
+- Đọc dữ liệu nhạy cảm trong database nếu không được mã hóa
+
+**Repo này xây dựng một hệ thống phòng thủ hoàn chỉnh cho đúng bài toán đó.**
+
+Cụ thể, hệ thống đảm bảo 3 điều:
+
+**1. Chỉ đúng người mới được vào:**
+Người dùng phải đăng nhập qua Keycloak với mật khẩu + mã OTP 6 số. Token
+sau khi đăng nhập chỉ sống 15 phút và bị khóa chặt vào thiết bị đang dùng —
+lấy được token cũng không dùng ở nơi khác được.
+
+**2. Đúng người nhưng chỉ được làm đúng việc của mình:**
+Khách hàng chỉ thấy đơn hàng của chính mình. Nhân viên không xóa được sản
+phẩm. Admin mới có toàn quyền. Mọi quyết định phân quyền đều được ghi log
+với lý do cụ thể.
+
+**3. Dữ liệu không thể bị đọc trộm hoặc chỉnh sửa:**
+Mọi kết nối đều mã hóa bằng TLS 1.3. Dữ liệu nhạy cảm trong database được
+mã hóa AES-256-GCM — dù ai đó lấy được file database cũng không đọc được gì.
+Khóa mã hóa được quản lý tự động và thay mới định kỳ.
+
+---
+
+| Thành phần | Công nghệ | Làm gì |
 |---|---|---|
-| **API Gateway** | Kong | JWT hardening, DPoP/PoP, rate-limiting, WAF, CORS, HSTS |
-| **Identity Provider** | Keycloak | OIDC, WebAuthn/TOTP, PKCE, refresh token rotation |
-| **Authorization** | OPA / Rego | RBAC→ABAC, deny-by-default, log 100% quyết định |
-| **Key Management** | HashiCorp Vault | Envelope encryption KEK/DEK, rotation ≤ 10 phút |
-| **Replay Protection** | Redis | DPoP jti store (SET NX + TTL), thay bằng mTLS ở D2 |
-| **Observability** | Grafana + Loki + Promtail | Structured logs, security dashboard, anomaly detection |
-| **CI/CD** | GitHub Actions | SAST, secrets scan, SCA, DAST, artifact signing |
+| **Frontend** | React + Vite | SPA — giao diện 3 role: Admin, Staff, Customer |
+| **API Gateway** | Kong 3.6 | Cửa ngõ duy nhất — kiểm tra token, chặn request bất thường |
+| **Identity Provider** | Keycloak 24.0 | Quản lý đăng nhập, OTP, cấp token |
+| **Authorization** | OPA / Rego 0.65.0 | Quyết định ai được làm gì |
+| **Key Management** | HashiCorp Vault 1.15 | Quản lý và tự động thay khóa mã hóa |
+| **Replay Protection** | Redis | Ghi nhớ token đã dùng — chặn dùng lại |
+| **Observability** | Grafana + Loki + Promtail | Ghi log mọi thứ, cảnh báo khi có bất thường |
+| **CI/CD** | GitHub Actions | Tự động kiểm tra bảo mật mỗi lần cập nhật code |
 
 ---
 
 ## Kiến trúc hệ thống
 ```
-Internet — Client (SPA / Mobile / 3rd-party)
-        │  HTTPS / TLS 1.3
-        ▼
-  ┌──────────────────────┐
-  │      WAF Layer       │  Cloudflare / ModSecurity
-  │  [production only]   │  (không có trong Docker lab)
-  └──────────┬───────────┘
-             │
-             │  ◀ Trust Boundary: edge-net
-             ▼
-  ┌─────────────────────────────────────────────────────┐
-  │               API Gateway — Kong                    │
-  │   gateway/kong.yml · deck/kong-declarative.yml      │
-  │   • TLS 1.3 termination                             │
-  │   • JWT verify RS256 · alg=none block · kid list    │
-  │   • Rate limiting · CORS · HSTS                     │
-  │   Plugins: jwt-hardening.lua · opa-authz.lua        │
-  │            hsts-header.lua                          │
-  └────┬──────────────────────┬──────────────────┬──────┘
-       │ JWKS fetch / PKCE    │ policy check     │ request (auth OK)
-       ▼                      ▼                  │
-  ┌────────────────┐  ┌───────────────────────┐  │
-  │ Keycloak (IdP) │  │      OPA — PDP        │  │
-  │ idp/keycloak/  │  │  opa/policies/        │  │
-  │ • OAuth2/OIDC  │  │  • authz.rego         │  │
-  │ • PKCE flow    │  │  • admin.rego         │  │
-  │ • TOTP MFA     │  │  • rate_limit.rego    │  │
-  │ • JWKS endpoint│  │  • deny-by-default    │  │
-  └────────────────┘  │  • decision logs      │  │
-                      └───────────────────────┘  │
-                                                 │
-            ◀ Trust Boundary: internal-net      │
-             ┌───────────────────────────────────┘
-             ▼
-  ┌───────────────────────────────────────────────────┐
-  │             Backend API — FastAPI                 │
-  │   backend/app/                                    │
-  │   Middleware: auth_middleware · logging_middleware│
-  │   Security:  dpop_verifier · aead_encryption      │
-  │              totp_verify · jwt_verify             │
-  │   Services:  user · order · product               │
-  └─────────┬──────────────┬───────────────┬──────────┘
-            │ jti check    │ DEK encrypt   │ AEAD read/write
-            ▼              ▼               ▼
-  ┌──────────────┐  ┌─────────────────┐  ┌───────────────┐
-  │    Redis     │  │ HashiCorp Vault │  │  PostgreSQL   │
-  │ DPoP jti     │  │  vault/init/    │  │  backend/db/  │
-  │ replay store │  │ • KEK/DEK cycle │  │ • AEAD fields │
-  │ SET NX + TTL │  │ • rotation≤10m  │  │ • AES-256-GCM │
-  │ (D2 → mTLS)  │  │ • dek-policy    │  │ • nonce/record│
-  └──────────────┘  └─────────────────┘  └───────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  CI/CD Pipeline                                                         │
+│  GitHub  ──►  GitHub Actions  ──►  Container Registry                   │
+└─────────────────────────────────────────────────────────────────────────┘
 
-  ◀ obs-net — Observability (thu thập log từ tất cả services)
-  ┌────────────────────────────────────────────────────┐
-  │  kong.log · auth.log (OPA) · FastAPI logs          │
-  │          │                                         │
-  │          ▼                                         │
-  │   Promtail ──► Loki ──► Grafana Dashboard          │
-  │                         api-security-dashboard.json│
-  └────────────────────────────────────────────────────┘
+                            ┌──────────────┐   ┌────────────────┐
+                            │   Browser /  │   │  Mobile App /  │
+                            │   React SPA  │   │  3rd-party     │
+                            └──────┬───────┘   └───────┬────────┘
+                                   │                   │
+                                   └─────────┬─────────┘
+                                             │
+                                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Security & Service Layer                                                │
+│                                                                          │
+│   ┌────────────┐                        ┌────────┐   ┌────────────────┐  │
+│   │  Keycloak  │◄──────────────────────►│  Kong  │   │ Key Management │  │
+│   │  OIDC/PKCE │  authentication        │   API  │   │ (Vault)        │  │
+│   └────────────┘                        │Gateway │   └───────┬────────┘  │
+│                                         │        │           │           │
+│   ┌────────────┐                        │        │           │ (yellow)  │
+│   │    OPA     │◄──────────────────────►│        │           │           │
+│   │   Policy   │  authorization         └───┬────┘           │           │
+│   │   Engine   │                            │                │           │
+│   └────────────┘                            │                ▼           │
+│                                             ▼         ┌───────────────┐  │
+│                             ┌───────────────────┐     │  PostgreSQL   │  │
+│   ┌──────────┐              │   FastAPI Backend │───► │  Encrypted DB │  │
+│   │  Redis   │◄────────────►│   Business Logic  │     └───────────────┘  │
+│   │  Replay  │  jti check   │   DPoP · mTLS     │                        │
+│   │  Store   │              └───────────────────┘                        │
+│   └──────────┘                                                           │
+│                        ╔══════════════════════════╗                      │
+│                        ║  alg=none JWT  →  401    ║  blocked threats     │
+│                        ║  Replay attack →  401    ║                      │
+│                        ║  BOLA / IDOR   →  403    ║                      │
+│                        ╚══════════════════════════╝                      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Monitoring & Observability                                             │
+│  Promtail  ──►  Loki  ──►  Grafana                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  Legend:
+  ──►  Data flow                        ◄──►  Authentication (Keycloak ↔ Kong)
+  ◄──► Authorization (OPA ↔ Kong)       yellow = Key Management
 ```
-Sơ đồ đầy đủ: [`ARCH/ARCH.drawio`](ARCH/ARCH.drawio) (mở bằng [draw.io](https://app.diagrams.net)) hoặc [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
+Sơ đồ đầy đủ: [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
 
 **Port mapping Docker (D1):**
 
 | Service | Port |
 |---|---|
+| Frontend (React/Vite) | `:5173` |
 | FastAPI (Backend) | `:9000` |
 | Kong API Gateway | `:8000` |
 | Keycloak | `:8081` |
@@ -168,6 +204,41 @@ Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 ├── RUNBOOK.md                       # Hướng dẫn chạy từ máy sạch
 ├── docker-compose.yml               # D1: toàn bộ stack 1 lệnh
 │
+├── frontend/                        # React + Vite SPA
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── package.json
+│   ├── index.html                   # Entry point Vite
+│   └── src/
+│       ├── context/
+│       │   └── CartContext.jsx      # Shared cart state (React Context)
+│       ├── layouts/
+│       │   ├── AdminLayout.jsx      # Sidebar + Outlet cho Admin
+│       │   ├── StaffLayout.jsx      # Sidebar + Outlet cho Staff
+│       │   └── CustomerLayout.jsx   # Navbar + Outlet cho Customer
+│       ├── pages/
+│       │   ├── auth/
+│       │   │   └── Login.jsx        # Đăng nhập 2 bước (email + OTP)
+│       │   ├── admin/
+│       │   │   ├── Dashboard.jsx    # KPI, biểu đồ, audit log
+│       │   │   ├── Orders.jsx       # Quản lý đơn hàng
+│       │   │   ├── Products.jsx     # CRUD sản phẩm
+│       │   │   ├── UserManagement.jsx  # Quản lý user + khoá tài khoản
+│       │   │   └── SystemSettings.jsx  # Toggle bảo mật, Vault, OPA policy
+│       │   ├── staff/
+│       │   │   ├── Dashboard.jsx    # Đơn cần xử lý, tồn kho sắp hết
+│       │   │   ├── Orders.jsx       # Cập nhật trạng thái đơn hàng
+│       │   │   └── Products.jsx     # Cập nhật tồn kho (không xoá)
+│       │   └── customer/
+│       │       ├── ProductCatalog.jsx  # Danh sách sản phẩm + giỏ hàng
+│       │       ├── MyOrders.jsx        # Đơn hàng + đặt hàng + thanh toán
+│       │       └── Profile.jsx         # Thông tin cá nhân + đổi mật khẩu
+│       ├── styles/
+│       │   ├── global.css           # Design system dùng chung toàn app
+│       │   └── login.css            # CSS riêng trang Login
+│       ├── App.jsx                  # Router + route definitions
+│       └── main.jsx                 # Entry point React
+│
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -178,7 +249,7 @@ Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 │       ├── db/                      # database.py, models.py, seed_data.py
 │       ├── middleware/              # auth_middleware.py, logging_middleware.py
 │       ├── security/                # aead_encryption.py, dpop_verifier.py,
-│       │                            #   jwt_verify.py, totp_verify.py
+│       │                            # jwt_verify.py, totp_verify.py
 │       ├── services/                # order_service.py, product_service.py, user_service.py
 │       └── tests/                   # test_orders.py, test_security.py, test_users.py
 │
@@ -228,11 +299,11 @@ Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 │
 ├── scripts/
 │   ├── attacks/                     # bola_attack.py, replay_dpop_attack.py,
-│   │                                #   alg_none_attack.py, nonce_reuse_test.py
+│   │                                # alg_none_attack.py, nonce_reuse_test.py
 │   ├── evaluation/                  # e_c1_tls_capture.sh, e_c2_nonce_test.py,
-│   │                                #   e_c3_aead_integrity.py, e_n1_totp_test.py,
-│   │                                #   e_x1_rotation_test.sh, e_z1_policy_test.sh,
-│   │                                #   e_z2_token_hardening.sh
+│   │                                # e_c3_aead_integrity.py, e_n1_totp_test.py,
+│   │                                # e_x1_rotation_test.sh, e_z1_policy_test.sh,
+│   │                                # e_z2_token_hardening.sh
 │   └── security_testing/            # run_dast.sh, run_fuzz.sh, run_sast.sh
 │
 └── tests/
@@ -251,8 +322,8 @@ Kết quả đo lường: [`RESULTS.md`](RESULTS.md)
 | Thành phần | Phiên bản |
 |---|---|
 | Docker & Docker Compose | ≥ 24.x / v2.x |
+| Node.js | ≥ 18 |
 | Python | ≥ 3.11 |
-| Node.js (optional, Kong deck) | ≥ 18 |
 | Git | ≥ 2.40 |
 | RAM khuyến nghị | ≥ 8 GB |
 
@@ -278,7 +349,90 @@ docker compose exec backend python -m app.db.seed_data
 
 # Bước 5 — Kiểm tra nhanh
 curl http://localhost:8000/api/v1/products   # qua Kong → 200 OK
-curl http://localhost:9002/docs              # FastAPI Swagger UI
+curl http://localhost:9000/docs              # FastAPI Swagger UI
+```
+
+---
+
+## 🖥 Hướng dẫn Frontend
+![alt text](image.png)
+### Chạy development (standalone)
+
+```bash
+cd frontend
+
+# Cài dependencies
+npm install
+
+# Chạy dev server
+npm run dev
+# → http://localhost:5173
+```
+
+### Build production
+
+```bash
+cd frontend
+npm run build        # output vào frontend/dist/
+npm run preview      # preview bản build local
+```
+
+### Cấu trúc route
+
+| URL | Trang | Role |
+|---|---|---|
+| `/login` | Đăng nhập 2 bước | Tất cả |
+| `/admin/dashboard` | Dashboard tổng quan | Admin |
+| `/admin/orders` | Quản lý đơn hàng | Admin |
+| `/admin/products` | Quản lý sản phẩm (CRUD) | Admin |
+| `/admin/users` | Quản lý người dùng | Admin |
+| `/admin/settings` | Cài đặt bảo mật hệ thống | Admin |
+| `/staff/dashboard` | Dashboard nhân viên | Staff |
+| `/staff/orders` | Xử lý đơn hàng | Staff |
+| `/staff/products` | Cập nhật tồn kho | Staff |
+| `/customer/productcatalog` | Danh sách sản phẩm | Customer |
+| `/customer/myorders` | Đơn hàng của tôi | Customer |
+| `/customer/profile` | Tài khoản cá nhân | Customer |
+
+### Tài khoản demo
+
+| Email | Mật khẩu | Role | MFA |
+|---|---|---|---|
+| `phuc@company.com` | `demo1234` | Admin | TOTP (nhập bất kỳ 6 số) |
+| `kiet@company.com` | `demo1234` | Staff | TOTP (nhập bất kỳ 6 số) |
+| `an@gmail.com` | `demo1234` | Customer | Không bắt buộc |
+
+> 💡 Ở chế độ demo, nhập bất kỳ 6 chữ số nào (VD: `123456`) để vượt qua bước OTP.
+
+### Tính năng chính theo role
+
+**Admin:**
+- Dashboard với KPI, biểu đồ doanh thu 7 ngày (hover để xem chi tiết), Security Audit Log
+- Quản lý đơn hàng — lọc theo trạng thái, xem chi tiết qua drawer
+- CRUD sản phẩm — thêm, sửa, xoá với modal
+- Quản lý user — khoá/mở khoá tài khoản, thêm user mới, thông báo bảo mật
+- Cài đặt hệ thống — toggle bật/tắt TLS, DPoP, MFA, WAF; Vault key rotation log; OPA policy viewer
+
+**Staff:**
+- Dashboard với đơn cần xử lý và tồn kho sắp hết
+- Xử lý đơn hàng — cập nhật trạng thái (Xác nhận → Giao hàng → Hoàn thành)
+- Cập nhật tồn kho — không có quyền thêm/xoá sản phẩm
+
+**Customer:**
+- Duyệt sản phẩm — tìm kiếm, lọc danh mục, thêm vào giỏ hàng
+- Giỏ hàng — shared state qua React Context, cập nhật realtime trên navbar
+- Đơn hàng — xem chi tiết, chọn phương thức thanh toán, đặt hàng, xoá khỏi giỏ
+- Profile — cập nhật thông tin cá nhân, đổi mật khẩu
+
+### Dependencies chính
+
+```json
+{
+  "react": "^18.x",
+  "react-dom": "^18.x",
+  "react-router-dom": "^6.x",
+  "vite": "^5.x"
+}
 ```
 
 ---
@@ -287,7 +441,8 @@ curl http://localhost:9002/docs              # FastAPI Swagger UI
 
 | Service | URL | Mô tả |
 |---|---|---|
-| 🌐 FastAPI (Backend) | [`http://localhost:9002/docs`](http://localhost:9000/docs) | Swagger UI, thử API trực tiếp (debug only) |
+| 🌐 Frontend | [`http://localhost:5173`](http://localhost:5173) | React SPA — giao diện chính |
+| 🌐 FastAPI (Backend) | [`http://localhost:9000/docs`](http://localhost:9000/docs) | Swagger UI, thử API trực tiếp (debug only) |
 | ⚡ Kong API Gateway | [`http://localhost:8000/api`](http://localhost:8000/api) | Entry point chính cho mọi request |
 | 🔑 Keycloak Admin | [`http://localhost:8081`](http://localhost:8081) | Quản lý realm, user, token |
 | 📋 OPA | [`http://localhost:8181`](http://localhost:8181) | Policy engine, decision log |
@@ -312,7 +467,7 @@ curl -i -H "Authorization: Bearer $TOKEN" \
 
 # Gọi trực tiếp backend (bypass Kong — chỉ dùng khi debug nội bộ)
 curl -i -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9002/api/v1/users
+  http://localhost:9000/api/v1/users
 ```
 
 Chi tiết đầy đủ: [`DEPLOY/D1/Runbook.md`](DEPLOY/D1/Runbook.md)
@@ -415,11 +570,11 @@ GitHub Actions tự động chạy khi push lên `main` và `dev`:
 
 ## Phân công
 
-| Thành viên | Trụ kỹ thuật | Owns |
+| Thành viên | MSSV | Phụ trách |
 |---|---|---|
-| **Lưu Hồng Phúc** | Kong Edge · TLS 1.3 · DPoP · JWT hardening | `ARCH/` · `CRYPTO_SOLUTION.md` · `docker-compose.yml` · `gateway/` |
-| **Phan Thái Hưng** | FastAPI · Keycloak · AEAD at-rest · Vault · Postgres | `backend/` · `idp/` · `vault/` · `DEPLOY/D1/Runbook.md` |
-| **Võ Tưởng Tuấn Kiệt** | OPA/Rego · Evaluation · Docs · Video demo | `opa/` · `EVAL/` · `EVIDENCE/` · `scripts/` · `RESULTS.md` · `RUNBOOK.md` |
+| Lưu Hồng Phúc | 24521382 | |
+| Phan Thái Hưng | 24520624 | |
+| Võ Tưởng Tuấn Kiệt | 24520919 | |
 
 ---
 

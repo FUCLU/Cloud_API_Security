@@ -1,0 +1,119 @@
+import React, { useState } from 'react'
+
+const ORDERS = [
+  { id:'ORD-1042', name:'Nguyễn Văn An',    email:'an.nv@gmail.com',    date:'28/03 · 14:21', items:'Laptop ASUS (x1)',    amount:'15,490,000đ', status:'success',  addr:'123 Nguyễn Huệ, Q1' },
+  { id:'ORD-1041', name:'Trần Thị Bích',    email:'bich.tt@gmail.com',  date:'28/03 · 13:10', items:'Chuột Logitech (x2)', amount:'3,780,000đ',  status:'pending',  addr:'45 Lê Lợi, Q3' },
+  { id:'ORD-1040', name:'Lê Văn Cường',     email:'cuong.lv@gmail.com', date:'28/03 · 11:44', items:'Tai nghe Sony (x1)',  amount:'7,990,000đ',  status:'shipping', addr:'88 Hai Bà Trưng, Q1' },
+  { id:'ORD-1039', name:'Phạm Thị Dung',    email:'dung.pt@gmail.com',  date:'27/03 · 16:00', items:'Áo polo (x3)',        amount:'1,470,000đ',  status:'failed',   addr:'12 Đinh Tiên Hoàng, Q1' },
+  { id:'ORD-1038', name:'Hoàng Thị Emm',    email:'emm.ht@gmail.com',   date:'27/03 · 14:30', items:'Bàn phím (x1)',       amount:'2,450,000đ',  status:'shipping', addr:'77 Pasteur, Q3' },
+  { id:'ORD-1037', name:'Võ Tưởng Kiệt',    email:'kiet.vt@gmail.com',  date:'27/03 · 09:12', items:'Màn hình LG (x1)',    amount:'6,800,000đ',  status:'new',      addr:'99 Nam Kỳ Khởi Nghĩa' },
+  { id:'ORD-1036', name:'Phan Thái Hưng',   email:'hung.pt@gmail.com',  date:'26/03 · 17:55', items:'Sổ tay A5 (x5)',      amount:'325,000đ',    status:'success',  addr:'10 Tôn Thất Tùng' },
+  { id:'ORD-1035', name:'Nguyễn T. Giang',  email:'giang.nt@gmail.com', date:'26/03 · 15:20', items:'Cà phê (x3)',         amount:'540,000đ',    status:'pending',  addr:'55 Cách Mạng Tháng 8' },
+]
+
+const STATUS_LABEL = { new:'Mới', pending:'Đang xử lý', shipping:'Đang giao', success:'Hoàn thành', failed:'Thất bại' }
+const STATUS_BADGE = { new:'badge-purple', pending:'badge-amber', shipping:'badge-blue', success:'badge-green', failed:'badge-red' }
+
+export default function AdminOrders() {
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(null)
+
+  const filtered = ORDERS.filter(o =>
+    (filter === 'all' || o.status === filter) &&
+    (o.name.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search))
+  )
+
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <div className="topbar-title">Quản lý đơn hàng</div>
+          <div className="topbar-sub">Admin — xem tất cả đơn</div>
+        </div>
+        <div className="topbar-right">
+          <button className="btn btn-outline btn-sm">📤 Xuất Excel</button>
+          <button className="btn btn-primary btn-sm">+ Tạo đơn</button>
+        </div>
+      </div>
+
+      <div className="content">
+        <div className="status-tabs">
+          {[['all','Tất cả',8],['new','Mới',1],['pending','Đang xử lý',2],['shipping','Đang giao',2],['success','Hoàn thành',2],['failed','Thất bại',1]].map(([k,l,c]) => (
+            <div key={k} className={'stab'+(filter===k?' active':'')} onClick={() => setFilter(k)}>
+              {l} <span className="cnt">{c}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="filter-bar">
+          <div className="search-box">
+            <span>🔍</span>
+            <input placeholder="Tìm mã đơn, tên khách..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select><option>7 ngày qua</option><option>30 ngày qua</option><option>Tháng này</option></select>
+        </div>
+
+        <div className="card">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày đặt</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr>
+              </thead>
+              <tbody>
+                {filtered.map(o => (
+                  <tr key={o.id}>
+                    <td style={{fontWeight:700}}>#{o.id}</td>
+                    <td>{o.name}</td><td>{o.date}</td><td>{o.items}</td><td>{o.amount}</td>
+                    <td><span className={`badge ${STATUS_BADGE[o.status]}`}>{STATUS_LABEL[o.status]}</span></td>
+                    <td><button className="btn btn-outline btn-xs" onClick={() => setSelected(o)}>Chi tiết</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="pagination">
+            <span className="page-info">{filtered.length} đơn hàng</span>
+          </div>
+        </div>
+      </div>
+
+      {selected && (
+        <>
+          <div className="drawer-overlay open" onClick={() => setSelected(null)} />
+          <div className="drawer open">
+            <div className="drawer-header">
+              <div>
+                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'20px'}}>#{selected.id}</div>
+                <div style={{fontSize:'12px',color:'var(--muted)',marginTop:'3px'}}>{selected.date}</div>
+              </div>
+              <button className="drawer-close" onClick={() => setSelected(null)}>✕</button>
+            </div>
+            <div className="drawer-body">
+              {[
+                ['Khách hàng', selected.name],
+                ['Email',      selected.email],
+                ['Sản phẩm',  selected.items],
+                ['Tổng tiền',  selected.amount],
+                ['Địa chỉ',   selected.addr],
+              ].map(([k,v]) => (
+                <div key={k} className="sec-item">
+                  <span className="sec-name">{k}</span>
+                  <span className="sec-val" style={k==='Tổng tiền'?{fontWeight:700}:{}}>{v}</span>
+                </div>
+              ))}
+              <div className="sec-item">
+                <span className="sec-name">Trạng thái</span>
+                <span className={`badge ${STATUS_BADGE[selected.status]}`}>{STATUS_LABEL[selected.status]}</span>
+              </div>
+            </div>
+            <div className="drawer-footer">
+              <button className="btn btn-primary" style={{flex:1}}>Cập nhật trạng thái</button>
+              <button className="btn btn-outline" onClick={() => setSelected(null)}>Đóng</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  )
+}

@@ -1,5 +1,6 @@
 services:
 
+# Database
   postgres:
     image: postgres:15
     container_name: api-postgres
@@ -13,6 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+# Backend - FastAPI
   backend:
     build:
       context: ./backend
@@ -27,6 +29,9 @@ services:
       OPA_URL: http://opa:8181
       VAULT_ADDR: http://vault:8200
 
+# Frontend - React 
+
+# API Gateway
   kong:
     image: kong:3.6
     container_name: api-gateway
@@ -47,6 +52,7 @@ services:
       - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
       - ./gateway/plugins:/usr/local/kong/plugins
 
+# Indentity provider
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: keycloak
@@ -59,6 +65,7 @@ services:
     volumes:
       - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
 
+# Policy engine
   opa:
     image: openpolicyagent/opa:latest
     container_name: opa
@@ -73,6 +80,7 @@ services:
       - ./opa/config:/config
       - ./opa/policies:/policies
 
+# Secret manager (dev mode)
   vault:
     image: hashicorp/vault:1.15
     container_name: vault
@@ -82,6 +90,7 @@ services:
       VAULT_DEV_ROOT_TOKEN_ID: root
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
 
+# Observability 
   loki:
     image: grafana/loki:latest
     container_name: loki
