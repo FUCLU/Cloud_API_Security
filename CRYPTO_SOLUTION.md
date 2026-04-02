@@ -2,7 +2,7 @@
 
 > **Đề tài:** Cloud API-Based Network Application Security for Small Company Services
 > **Môn:** NT219.Q21.ANTT — Mật mã học | UIT
-> **Stack:** Kong 3.6 · Keycloak 24.0 (realm: **lab**) · HashiCorp Vault **1.15** · FastAPI 0.110.0 · OPA 0.65.0
+> **Stack:** Kong 3.6 · Keycloak 24.0 (realm: **cloudapi**) · HashiCorp Vault **1.15** · FastAPI 0.110.0 · OPA 0.65.0
 
 ---
 
@@ -178,7 +178,7 @@ bash scripts/evaluation/e_x1_rotation_test.sh
 
 **Chuẩn áp dụng:** NIST SP 800-63B — AAL2; RFC 6238 — TOTP
 
-TOTP bắt buộc cho admin (role `admin`). Không có bypass route. Keycloak realm `lab` xử lý toàn bộ TOTP flow — frontend không render OTP form.
+TOTP bắt buộc cho admin (role `admin`). Không có bypass route. Keycloak realm `cloudapi` xử lý toàn bộ TOTP flow — frontend không render OTP form.
 
 **Triển khai (backend/app/security/totp_verify.py):**
 ```python
@@ -193,7 +193,7 @@ class TOTPVerifier:
         return pyotp.random_base32()  # 160-bit entropy
 ```
 
-**Keycloak TOTP config (idp/keycloak/realm-export.json, realm=lab):**
+**Keycloak TOTP config (idp/keycloak/realm-export.json, realm=cloudapi):**
 - Algorithm: HmacSHA1 (RFC 4226)
 - Digits: 6
 - Period: 30 giây
@@ -219,7 +219,7 @@ PKCE bắt buộc cho public clients (SPA). Không thể thiếu `code_challenge
 1. Frontend tạo code_verifier (random 43–128 ký tự)
 2. code_challenge = BASE64URL(SHA256(code_verifier))
 3. Redirect đến Keycloak:
-   GET http://localhost:8081/realms/lab/protocol/openid-connect/auth
+   GET http://localhost:8081/realms/cloudapi/protocol/openid-connect/auth
        ?response_type=code
        &client_id=spa-client
        &code_challenge=<hash>
@@ -227,7 +227,7 @@ PKCE bắt buộc cho public clients (SPA). Không thể thiếu `code_challenge
 4. Keycloak yêu cầu login + TOTP (nếu admin)
 5. Keycloak redirect về frontend với authorization_code
 6. Frontend đổi code → token:
-   POST http://localhost:8081/realms/lab/protocol/openid-connect/token
+   POST http://localhost:8081/realms/cloudapi/protocol/openid-connect/token
        grant_type=authorization_code
        &code=<auth_code>
        &code_verifier=<original>
@@ -248,7 +248,7 @@ PKCE bắt buộc cho public clients (SPA). Không thể thiếu `code_challenge
 **Kong plugin (gateway/plugins/jwt-hardening.lua):**
 - Pin algorithm: chỉ chấp nhận `RS256` — reject mọi alg khác kể cả `none`
 - kid whitelist: chỉ chấp nhận kid có trong JWKS endpoint Keycloak
-- JWKS endpoint: `http://keycloak:8080/realms/lab/protocol/openid-connect/certs`
+- JWKS endpoint: `http://keycloak:8080/realms/cloudapi/protocol/openid-connect/certs`
 
 **3 attack vectors bị block (Invariant I4 — E-Z2.md):**
 

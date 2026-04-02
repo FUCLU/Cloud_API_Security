@@ -38,7 +38,7 @@ xdg-open http://localhost:5173       # Linux
 | 🌐 FastAPI Backend | `http://localhost:9000/docs` | Swagger UI, debug trực tiếp (bypass Kong) |
 | ⚡ Kong API Gateway | `http://localhost:8000/api` | Entry point chính — dùng port này để test |
 | ⚡ Kong Admin API | `http://localhost:8001` | Internal admin — không expose ra ngoài |
-| 🔑 Keycloak Admin | `http://localhost:8081` | UI: `/admin` · OIDC: `/realms/lab` |
+| 🔑 Keycloak Admin | `http://localhost:8081` | UI: `/admin` · OIDC: `/realms/cloudapi` |
 | 📋 OPA | `http://localhost:8181` | REST API: `/v1/policies`, `/v1/data` |
 | 🔐 Vault UI | `http://localhost:8200` | Token: giá trị `VAULT_DEV_ROOT_TOKEN_ID` trong `.env` |
 | 📊 Grafana | `http://localhost:3000` | `admin` / `GF_SECURITY_ADMIN_PASSWORD` trong `.env` |
@@ -190,7 +190,7 @@ curl -i http://localhost:8000/api/v1/products
 curl -i http://localhost:8000/api/v1/users
 
 # Lấy token từ Keycloak (Client Credentials — cho test nhanh)
-TOKEN=$(curl -s -X POST http://localhost:8081/realms/lab/protocol/openid-connect/token \
+TOKEN=$(curl -s -X POST http://localhost:8081/realms/cloudapi/protocol/openid-connect/token \
   -d "client_id=backend-client" \
   -d "client_secret=<secret-from-keycloak>" \
   -d "grant_type=client_credentials" | jq -r '.access_token')
@@ -209,8 +209,8 @@ curl -i -H "Authorization: Bearer $TOKEN" http://localhost:9000/api/v1/users
 | Kong Admin API | `http://localhost:8001` | — (internal admin port) |
 | FastAPI Swagger | `http://localhost:9000/docs` | — (JWT required cho secured routes) |
 | Keycloak Admin | `http://localhost:8081/admin` | `admin` / giá trị `KEYCLOAK_ADMIN_PASSWORD` trong `.env` |
-| Keycloak OIDC | `http://localhost:8081/realms/lab` | — |
-| Keycloak JWKS | `http://localhost:8081/realms/lab/protocol/openid-connect/certs` | — |
+| Keycloak OIDC | `http://localhost:8081/realms/cloudapi` | — |
+| Keycloak JWKS | `http://localhost:8081/realms/cloudapi/protocol/openid-connect/certs` | — |
 | Vault UI | `http://localhost:8200` | Token: `VAULT_DEV_ROOT_TOKEN_ID` trong `.env` |
 | Grafana | `http://localhost:3000` | `admin` / `GF_SECURITY_ADMIN_PASSWORD` trong `.env` |
 | OPA REST API | `http://localhost:8181/v1/policies` | — |
@@ -317,7 +317,7 @@ bash vault/init/enable-transit.sh
 
 ### 5.2 Import Keycloak realm
 
-Keycloak tự động import realm `lab` từ mount volume khi container khởi động:
+Keycloak tự động import realm `cloudapi` từ mount volume khi container khởi động:
 ```yaml
 volumes:
   - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
@@ -325,8 +325,8 @@ volumes:
 
 Verify realm import:
 ```bash
-curl http://localhost:8081/realms/lab/.well-known/openid-configuration | jq .
-# Phải thấy: "issuer": "http://localhost:8081/realms/lab"
+curl http://localhost:8081/realms/cloudapi/.well-known/openid-configuration | jq .
+# Phải thấy: "issuer": "http://localhost:8081/realms/cloudapi"
 ```
 
 Import thủ công nếu cần:
@@ -359,7 +359,7 @@ docker compose exec opa opa test /policies /tests -v
 ```
 Browser (http://localhost:5173)
   ↓ PKCE redirect
-Keycloak (http://localhost:8081/realms/lab)
+Keycloak (http://localhost:8081/realms/cloudapi)
   ↓ authorization_code → access_token (JWT RS256)
 Frontend (memory store)
   ↓ Authorization: Bearer <token>
@@ -397,7 +397,7 @@ open http://localhost:5173
 ```bash
 VITE_KEYCLOAK_URL=http://localhost:8081
 VITE_KONG_URL=http://localhost:8000
-VITE_REALM=lab
+VITE_REALM=cloudapi
 VITE_CLIENT_ID=spa-client
 ```
 
@@ -445,15 +445,28 @@ docker compose logs opa | grep "deny"
 
 ### 7.3 Grafana Dashboard
 
+Dashboard **"API Security Monitor — NT219"** tự động load khi stack khởi động.
+
 1. Mở `http://localhost:3000`
-2. Login `admin` / password từ `.env`
-3. Vào **Dashboards → API Security Dashboard**
+2. Login `admin` / `admin` (hoặc password từ `.env`)
+3. Vào **Dashboards → General → API Security Monitor — NT219**
 4. Xem panels:
-   - Request count by status code
-   - Auth failures per minute
-   - OPA deny decisions (với reason)
-   - Rate limit hits
-   - OPA decision log stream
+   - Login Success vs Auth Failure (Keycloak realtime)
+   - OPA Authorization Decisions (allow/deny)
+   - HTTP Response Codes qua Kong (200/401/403/429)
+   - DPoP Replay Attack Detection
+   - Security Event Log (log thô tất cả services)
+
+> Chạy attack scripts (`bola_attack.py`, `replay_dpop_attack.py`) rồi xem spike trên dashboard để lấy evidence.
+
+**Troubleshoot nếu dashboard không hiện:**
+```bash
+docker compose restart grafana
+# Nếu vẫn không hiện — xóa volume cũ:
+docker compose down grafana
+docker volume rm cloud_api_security_grafana_data
+docker compose up -d grafana
+```
 
 ### 7.4 Kiểm tra structured log format
 
@@ -594,7 +607,7 @@ SLA: **≤10 phút** từ lúc trigger đến key mới active. Key cũ reject t
 ### 9.2 Rotate Keycloak signing key
 
 ```bash
-curl -X POST http://localhost:8081/admin/realms/lab/keys \
+curl -X POST http://localhost:8081/admin/realms/cloudapi/keys \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"rsa-generated","providerId":"rsa-generated","providerType":"org.keycloak.keys.KeyProvider"}'
@@ -629,9 +642,9 @@ docker compose restart <service-name>
 # Kiểm tra format JSON
 python3 -m json.tool idp/keycloak/realm-export.json > /dev/null
 
-# Verify realm URL đúng (phải là "lab", không phải "apirealm")
-curl http://localhost:8081/realms/lab/.well-known/openid-configuration | jq .issuer
-# Expected: "http://localhost:8081/realms/lab"
+# Verify realm URL đúng (phải là "cloudapi", không phải "apirealm")
+curl http://localhost:8081/realms/cloudapi/.well-known/openid-configuration | jq .issuer
+# Expected: "http://localhost:8081/realms/cloudapi"
 
 # Import thủ công qua UI: http://localhost:8081/admin → Create Realm → Upload file
 ```
@@ -661,8 +674,8 @@ docker compose exec kong kong reload
 ### JWT bị reject khi alg hợp lệ
 
 ```bash
-# Kiểm tra JWKS từ Keycloak (realm=lab)
-curl http://localhost:8081/realms/lab/protocol/openid-connect/certs | jq .
+# Kiểm tra JWKS từ Keycloak (realm=cloudapi)
+curl http://localhost:8081/realms/cloudapi/protocol/openid-connect/certs | jq .
 
 # So sánh kid trong token với JWKS
 echo "<jwt-token>" | python3 -c "
@@ -677,8 +690,8 @@ print(json.loads(base64.b64decode(padded).decode()))
 ### Frontend không kết nối được Keycloak
 
 ```bash
-# Verify Keycloak realm "lab" (không phải apirealm)
-curl http://localhost:8081/realms/lab
+# Verify Keycloak realm "cloudapi" (không phải apirealm)
+curl http://localhost:8081/realms/cloudapi
 
 # Verify biến môi trường frontend
 docker compose exec api-frontend env | grep VITE
@@ -712,7 +725,7 @@ docker compose down -v --remove-orphans
 | Service | Image | Phiên bản | Port | Ghi chú |
 |---|---|---|---|---|
 | Kong | `kong:3.6` | **3.6** | 8000, 8443, 8001 | API Gateway + PEP |
-| Keycloak | `quay.io/keycloak/keycloak:24.0` | **24.0** | 8081→8080 | IdP + OIDC, realm=**lab** |
+| Keycloak | `quay.io/keycloak/keycloak:24.0` | **24.0** | 8081→8080 | IdP + OIDC, realm=**cloudapi** |
 | OPA | `openpolicyagent/opa:0.65.0` | **0.65.0** | 8181 | PDP + Rego |
 | HashiCorp Vault | `hashicorp/vault:1.15` | **1.15** | 8200 | KMS + Transit |
 | PostgreSQL | `postgres:16` | **16** | 5434→5432 | Database, DB=cloudapi |
