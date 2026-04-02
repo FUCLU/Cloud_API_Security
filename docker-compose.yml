@@ -1,7 +1,7 @@
 networks:
-  edge-net:       # Kong ↔ Frontend ↔ Keycloak
-  internal-net:   # Backend ↔ OPA ↔ Vault ↔ Postgres ↔ Redis
-  obs-net:        # Loki ↔ Promtail ↔ Grafana
+  edge-net:
+  internal-net:
+  obs-net:
 
 volumes:
   postgres_data:
@@ -9,7 +9,6 @@ volumes:
 
 services:
 
-  # DATABASE
   postgres:
     image: postgres:16
     container_name: api-postgres
@@ -30,7 +29,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # REPLAY PROTECTION
   redis:
     image: redis:7
     container_name: api-redis
@@ -45,7 +43,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # SECRET MANAGER (dev mode)
   vault:
     image: hashicorp/vault:1.15
     container_name: vault
@@ -65,7 +62,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # POLICY ENGINE
   opa:
     image: openpolicyagent/opa:0.65.0
     container_name: opa
@@ -76,7 +72,6 @@ services:
       - "--addr=0.0.0.0:8181"
       - "--config-file=/config/opa-config.yaml"
       - "--set=decision_logs.console=true"
-      - "--set=decision_logs.plugin=print"
       - "/policies"
     ports:
       - "8181:8181"
@@ -86,12 +81,34 @@ services:
     networks:
       - internal-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      test: ["CMD", "/opa", "version"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
-  # BACKEND — FastAPI
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    restart: always
+    command: start-dev --import-realm
+    ports:
+      - "8081:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    networks:
+      - edge-net
+      - internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/1/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+
   backend:
     build:
       context: ./backend
@@ -117,34 +134,12 @@ services:
     networks:
       - internal-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/health || exit 1"]
       interval: 15s
-      timeout: 5s
-      retries: 5
-
-  # IDENTITY PROVIDER
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    container_name: keycloak
-    restart: always
-    command: start-dev --import-realm
-    ports:
-      - "8081:8080"
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    volumes:
-      - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
-    networks:
-      - edge-net
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/realms/lab || exit 1"]
-      interval: 20s
       timeout: 10s
       retries: 10
-      start_period: 60s
+      start_period: 30s
 
-  # API GATEWAY
   kong:
     image: kong:3.6
     container_name: api-gateway
@@ -161,12 +156,11 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_PLUGINS: bundled,jwt-hardening,hsts-header,opa-authz
-      KONG_LUA_PACKAGE_PATH: /usr/local/kong/plugins/?.lua;;
+      KONG_PLUGINS: bundled
     ports:
-      - "8000:8000"   # Proxy (HTTP)
-      - "8443:8443"   # Proxy (HTTPS)
-      - "8001:8001"   # Admin API (nội bộ debug)
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
     volumes:
       - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
       - ./gateway/plugins:/usr/local/kong/plugins
@@ -179,7 +173,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # FRONTEND — React + Vite
   frontend:
     build:
       context: ./frontend
@@ -193,17 +186,17 @@ services:
     environment:
       - VITE_KEYCLOAK_URL=http://localhost:8081
       - VITE_KONG_URL=http://localhost:8000
-      - VITE_REALM=lab
+      - VITE_REALM=cloudapi
       - VITE_CLIENT_ID=spa-client
     networks:
       - edge-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  # OBSERVABILITY
   loki:
     image: grafana/loki:2.9.0
     container_name: loki
@@ -216,7 +209,7 @@ services:
     networks:
       - obs-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -258,7 +251,7 @@ services:
     networks:
       - obs-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
