@@ -1,0 +1,328 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Cloud API Security — NT219 Capstone | Auth Events · OPA Decisions · Attack Detection",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+
+    {
+      "id": 1,
+      "title": "🟢 Login Success vs ❌ Auth Failure",
+      "description": "Keycloak login events — so sánh đăng nhập thành công vs thất bại theo thời gian",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum by (kc_event_type) (count_over_time({service=\"keycloak\", kc_event_type=\"LOGIN\"}[$__interval]))",
+          "legendFormat": "Login Success",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (kc_event_type) (count_over_time({service=\"keycloak\", kc_event_type=\"LOGIN_ERROR\"}[$__interval]))",
+          "legendFormat": "Login Failure",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Login Success" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#2ecc71", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Login Failure" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#e74c3c", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 2,
+      "title": "🛡 OPA Authorization Decisions",
+      "description": "Quyết định allow/deny từ OPA — BOLA và IDOR bị chặn hiện ở đây",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"opa\", result=\"true\"}[$__interval]))",
+          "legendFormat": "Allow",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({service=\"opa\", result=\"false\"}[$__interval]))",
+          "legendFormat": "Deny (blocked)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Allow" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#3498db", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Deny (blocked)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#e74c3c", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 3,
+      "title": "⚡ HTTP Response Codes (Kong)",
+      "description": "401 = token lỗi / hết hạn | 403 = bị OPA chặn | 200 = thành công",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"kong\", status=\"200\"}[$__interval]))",
+          "legendFormat": "200 OK",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({service=\"kong\", status=\"401\"}[$__interval]))",
+          "legendFormat": "401 Unauthorized",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({service=\"kong\", status=\"403\"}[$__interval]))",
+          "legendFormat": "403 Forbidden (OPA)",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(count_over_time({service=\"kong\", status=\"429\"}[$__interval]))",
+          "legendFormat": "429 Rate Limited",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 8 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "200 OK" }, "properties": [{ "id": "color", "value": { "fixedColor": "#2ecc71", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "401 Unauthorized" }, "properties": [{ "id": "color", "value": { "fixedColor": "#f39c12", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "403 Forbidden (OPA)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#e74c3c", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "429 Rate Limited" }, "properties": [{ "id": "color", "value": { "fixedColor": "#9b59b6", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 4,
+      "title": "🔄 DPoP Replay Attack Detection",
+      "description": "Số lần DPoP jti bị từ chối do replay — chạy replay_dpop_attack.py để thấy spike",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"fastapi\", event=\"dpop_replay_rejected\"}[$__interval]))",
+          "legendFormat": "Replay blocked",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({service=\"fastapi\", event=\"dpop_valid\"}[$__interval]))",
+          "legendFormat": "DPoP valid",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Replay blocked" }, "properties": [{ "id": "color", "value": { "fixedColor": "#e74c3c", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "DPoP valid" }, "properties": [{ "id": "color", "value": { "fixedColor": "#2ecc71", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+
+    {
+      "id": 5,
+      "title": "📋 Security Event Log (realtime)",
+      "description": "Log thô từ tất cả services — filter theo service hoặc event để debug",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "{service=~\"fastapi|kong|opa|keycloak\"} |= \"\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "📊 Tổng request 1 giờ qua",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 26 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"kong\"}[1h]))",
+          "legendFormat": "Total Requests",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "blue", "value": null }] },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "colorMode": "background" }
+    },
+
+    {
+      "id": 7,
+      "title": "🚫 OPA Deny 1 giờ qua",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 26 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"opa\", result=\"false\"}[1h]))",
+          "legendFormat": "OPA Denies",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "colorMode": "background" }
+    },
+
+    {
+      "id": 8,
+      "title": "🔐 Auth Failures 1 giờ qua",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 26 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"keycloak\", kc_event_type=\"LOGIN_ERROR\"}[1h]))",
+          "legendFormat": "Auth Failures",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "colorMode": "background" }
+    },
+
+    {
+      "id": 9,
+      "title": "♻️ Replay Blocked 1 giờ qua",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 26 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=\"fastapi\", event=\"dpop_replay_rejected\"}[1h]))",
+          "legendFormat": "Replay Blocked",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "colorMode": "background" }
+    }
+
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["security", "api", "nt219"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+        "definition": "label_values(service)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": false,
+        "name": "service",
+        "options": [],
+        "query": "label_values(service)",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "API Security Monitor — NT219",
+  "uid": "api-security-nt219",
+  "version": 1
+}
