@@ -15,10 +15,6 @@ __pycache__/
 # Security captures
 *.pcap
 
-# Docker
-*.pid
-docker-compose.override.yml
-
 # IDE
 .vscode/
 .idea/
