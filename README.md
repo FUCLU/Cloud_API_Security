@@ -690,7 +690,7 @@ GitHub Actions tự động chạy khi push lên `main` và `dev`:
 | **SCA** | pip-audit | `EVIDENCE/security_scans/sca_report.txt` |
 | **DAST** | OWASP ZAP (merge → main) | `EVIDENCE/security_scans/zap_report.html` |
 | **Fuzzing** | RESTler | `EVIDENCE/security_scans/restler_results/` |
-| **Artifact signing** | cosign | Container image signed trước khi deploy |
+| **Artifact signing** | cosign | Conta n iner image signed trước khi deploy |
  
 ---
  

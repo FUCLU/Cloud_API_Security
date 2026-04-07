@@ -34,7 +34,7 @@ services:
     container_name: api-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - internal-net
     healthcheck:
@@ -93,7 +93,7 @@ services:
     restart: always
     command: start-dev --import-realm
     ports:
-      - "8081:8080"
+      - "8082:8080"
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -124,7 +124,7 @@ services:
       vault:
         condition: service_healthy
     ports:
-      - "9000:9000"
+      - "9010:9000"
     environment:
       DATABASE_URL: postgresql://admin:admin123@postgres:5432/cloudapi
       OPA_URL: http://opa:8181
@@ -184,7 +184,7 @@ services:
     ports:
       - "5173:80"
     environment:
-      - VITE_KEYCLOAK_URL=http://localhost:8081
+      - VITE_KEYCLOAK_URL=http://localhost:8082
       - VITE_KONG_URL=http://localhost:8000
       - VITE_REALM=cloudapi
       - VITE_CLIENT_ID=spa-client
