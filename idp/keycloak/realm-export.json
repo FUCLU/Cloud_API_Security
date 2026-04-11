@@ -1,4 +1,77 @@
 {
-  "realm": "cloudapi",
-  "enabled": true
+  "realm": "lab",
+  "enabled": true,
+  "displayName": "Lab Realm - NT219",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "spa-client",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:5173/*", "http://127.0.0.1:5173/*"],
+      "webOrigins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+      "attributes": { "pkceCodeChallengeMethod": "S256" },
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true
+    },
+    {
+      "clientId": "backend-client",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "backend-secret-12345678",
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true
+    }
+  ],
+
+  "roles": {
+    "realm": [
+      { "name": "user" },
+      { "name": "admin" }
+    ]
+  },
+
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@lab.local",
+      "firstName": "Super",
+      "lastName": "Admin",
+      "enabled": true,
+      "credentials": [
+        { "type": "password", "value": "admin123", "temporary": false }
+      ],
+      "realmRoles": ["admin"],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    },
+    {
+      "username": "staff",
+      "email": "staff@lab.local",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "staff123", "temporary": false }],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "customer",
+      "email": "customer@lab.local",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "customer123", "temporary": false }],
+      "realmRoles": ["user"]
+    }
+  ]
 }

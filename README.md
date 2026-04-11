@@ -84,7 +84,53 @@ Khóa mã hóa được quản lý tự động và thay mới định kỳ.
 ---
 
 ## Kiến trúc hệ thống
-![alt text](architecture.png)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  CI/CD Pipeline                                                         │
+│  GitHub  ──►  GitHub Actions  ──►  Container Registry                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+                            ┌──────────────┐   ┌────────────────┐
+                            │   Browser /  │   │  Mobile App /  │
+                            │   React SPA  │   │  3rd-party     │
+                            └──────┬───────┘   └───────┬────────┘
+                                   │                   │
+                                   └─────────┬─────────┘
+                                             │
+                                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Security & Service Layer                                                │
+│                                                                          │
+│   ┌────────────┐                        ┌────────┐   ┌────────────────┐  │
+│   │  Keycloak  │◄──────────────────────►│  Kong  │   │ Key Management │  │
+│   │  OIDC/PKCE │  authentication        │   API  │   │ (Vault)        │  │
+│   └────────────┘                        │Gateway │   └───────┬────────┘  │
+│                                         │        │           │           │
+│   ┌────────────┐                        │        │           │ (yellow)  │
+│   │    OPA     │◄──────────────────────►│        │           │           │
+│   │   Policy   │  authorization         └───┬────┘           │           │
+│   │   Engine   │                            │                │           │
+│   └────────────┘                            │                ▼           │
+│                                             ▼         ┌───────────────┐  │
+│                             ┌───────────────────┐     │  PostgreSQL   │  │
+│   ┌──────────┐              │   FastAPI Backend │───► │  Encrypted DB │  │
+│   │  Redis   │◄────────────►│   Business Logic  │     └───────────────┘  │
+│   │  Replay  │  jti check   │   DPoP · mTLS     │                        │
+│   │  Store   │              └───────────────────┘                        │
+│   └──────────┘                                                           │
+│                        ╔══════════════════════════╗                      │
+│                        ║  alg=none JWT  →  401    ║  blocked threats     │
+│                        ║  Replay attack →  401    ║                      │
+│                        ║  BOLA / IDOR   →  403    ║                      │
+│                        ╚══════════════════════════╝                      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Monitoring & Observability                                             │
+│  Promtail  ──►  Loki  ──►  Grafana                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 Sơ đồ đầy đủ: [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
 
@@ -195,7 +241,7 @@ Cloud_Api_Security/
 │       ├── utils/                       # Security utilities
 │       │   ├── dpop.js                  # DPoP proof generator (Web Crypto ES256, RFC 9449)
 │       │   └── apiFetch.js              # Fetch wrapper: auto Authorization + DPoP header
-│       │
+│       │3
 │       ├── hooks/                       # Custom React hooks
 │       │   ├── useAuth.js               # Hook dùng AuthProvider context
 │       │   ├── useOrders.js             # Hook fetch + state orders
