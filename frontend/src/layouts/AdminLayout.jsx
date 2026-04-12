@@ -9,7 +9,7 @@ export default function AdminLayout() {
     <>
       <nav className="sidebar">
         <div className="sb-logo">
-          <img className = "brand-icon" src={logo} alt="logo" style={{ width: '70px', height: 'auto' }} />
+          <img className="brand-icon" src={logo} alt="logo" style={{ width: '70px', height: 'auto' }} />
           <div>
             <div className="sb-logo-name">E-MARKET</div>
             <div className="sb-logo-sub">Admin</div>
@@ -17,40 +17,30 @@ export default function AdminLayout() {
         </div>
         <div className="sb-nav">
           <div className="sb-section">Tổng quan</div>
-          <NavLink
-            to="/admin/dashboard"
-            className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}
-          >
+          <NavLink to="/admin/dashboard" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">◈</span>Dashboard
           </NavLink>
 
           <div className="sb-section">Kinh doanh</div>
-          <NavLink
-            to="/admin/products"
-            className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}
-          >
+          <NavLink to="/admin/products" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">▣</span>Sản phẩm
           </NavLink>
-          <NavLink
-            to="/admin/orders"
-            className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}
-          >
+          <NavLink to="/admin/orders" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">◎</span>Đơn hàng
-            <span className="sb-badge">3</span>
           </NavLink>
 
           <div className="sb-section">Hệ thống</div>
-          <NavLink
-            to="/admin/users"
-            className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}
-          >
+          <NavLink to="/admin/users" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">◉</span>Người dùng
           </NavLink>
-          <NavLink
-            to="/admin/settings"
-            className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}
-          >
+          <NavLink to="/admin/settings" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">⊙</span>Cài đặt hệ thống
+          </NavLink>
+
+          <div className="sb-section">Bảo mật</div>
+          <NavLink to="/admin/attacks" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
+            <span className="sb-icon">⚡</span>Attack Simulation
+            <span className="sb-badge" style={{ background:'#c84b2f' }}>Lab</span>
           </NavLink>
         </div>
 

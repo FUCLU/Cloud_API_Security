@@ -2,8 +2,66 @@ _format_version: "3.0"
 
 services:
   - name: backend-service
+    # tên service, dùng để tham chiếu
     url: http://backend:9000
+    # Kong forward request đến địa chỉ này
+    # "backend" là tên container trong docker-compose
+
     routes:
-      - name: backend-route
-        paths:
-          - /
+      - name: users-route
+        paths: ["/api/v1/users"]
+        # request vào /api/v1/users → forward đến backend
+
+      - name: products-route
+        paths: ["/api/v1/products"]
+
+      - name: orders-route
+        paths: ["/api/v1/orders"]
+
+      - name: health-route
+        paths: ["/health"]
+        # health check không cần auth
+
+plugins:
+  # Plugin 1: JWT verify - kiểm tra token hợp lệ
+  - name: jwt
+    config:
+      key_claim_name: kid
+      # lấy kid từ JWT header để tìm đúng key
+      claims_to_verify:
+        - exp
+        # kiểm tra token chưa hết hạn
+      secret_is_base64: false
+
+  # Plugin 2: CORS - cho phép browser gọi API
+  - name: cors
+    config:
+      origins:
+        - "https://localhost:5174"
+        - "http://localhost:5173"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - DPoP
+        - Content-Type
+      credentials: true
+
+  # Plugin 3: Rate limiting - chặn spam request
+  - name: rate-limiting
+    config:
+      minute: 100
+      # tối đa 100 request/phút mỗi IP
+      policy: local
+
+  # Plugin 4: Response headers bảo mật
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options:nosniff"
+          - "X-Frame-Options:DENY"

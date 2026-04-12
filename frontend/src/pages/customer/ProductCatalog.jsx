@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCart } from '../../context/CartContext'
 
 const CPRODS = [
   { n:'Laptop ASUS VivoBook 15',  c:'Điện tử',   p:'15,490,000đ', e:'💻', d:'Core i5, 8GB RAM, 512GB SSD', s:'ok' },
@@ -14,31 +13,14 @@ const CPRODS = [
 ]
 
 export default function ProductCatalog() {
-  const navigate = useNavigate()
-  const { cart, addItem, removeItem, totalQty } = useCart()
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState('')
-  const [toast, setToast] = useState('')
 
   const filtered = CPRODS.filter(p =>
     p.s !== 'out' &&
     (!search || p.n.toLowerCase().includes(search.toLowerCase())) &&
     (!cat || p.c === cat)
   )
-
-  function handleAdd(p) {
-    addItem(p)
-    setToast(`Đã thêm "${p.n}" vào giỏ!`)
-    setTimeout(() => setToast(''), 2000)
-  }
-
-  function handleRemove(name) {
-    removeItem(name)
-    setToast(`Đã xoá khỏi giỏ hàng`)
-    setTimeout(() => setToast(''), 2000)
-  }
-
-  const inCart = (name) => cart.find(i => i.n === name)
 
   return (
     <div style={{ flex: 1 }}>
@@ -61,49 +43,21 @@ export default function ProductCatalog() {
         </div>
 
         <div className="cat-grid">
-          {filtered.map(p => {
-            const added = inCart(p.n)
-            return (
-              <div key={p.n} className="pcard">
-                <div className="pimg">{p.e}</div>
-                <div className="pbody">
-                  <div className="pname">{p.n}</div>
-                  <div className="pdesc">{p.c} · {p.d}</div>
-                  {p.s === 'low' && <div style={{ fontSize:'11px', color:'var(--amber)', marginBottom:'4px' }}>⚠️ Sắp hết hàng</div>}
-                  <div className="pfoot">
-                    <div className="pprice">{p.p}</div>
-                    {added ? (
-                      <div style={{ display:'flex', gap:'4px' }}>
-                        <span style={{ fontSize:'11px', color:'var(--green)', alignSelf:'center' }}>×{added.qty}</span>
-                        <button className="btn btn-danger btn-xs" onClick={() => handleRemove(p.n)}>🗑</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => handleAdd(p)}>+</button>
-                      </div>
-                    ) : (
-                      <button className="btn btn-primary btn-sm" onClick={() => handleAdd(p)}>+ Giỏ hàng</button>
-                    )}
-                  </div>
+          {filtered.map(p => (
+            <div key={p.n} className="pcard">
+              <div className="pimg">{p.e}</div>
+              <div className="pbody">
+                <div className="pname">{p.n}</div>
+                <div className="pdesc">{p.c} · {p.d}</div>
+                {p.s === 'low' && <div style={{ fontSize:'11px', color:'var(--amber)', marginBottom:'4px' }}>⚠️ Sắp hết hàng</div>}
+                <div className="pfoot">
+                  <div className="pprice">{p.p}</div>
                 </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-          background:'var(--ink)', color:'#fff', padding:'10px 20px', borderRadius:'8px',
-          fontSize:'13px', zIndex:999, boxShadow:'0 4px 16px rgba(0,0,0,.2)'
-        }}>{toast}</div>
-      )}
-
-      {/* Floating cart */}
-      {totalQty > 0 && (
-        <div className="cart-count" onClick={() => navigate('/customer/myorders')}>
-          🛒 Giỏ hàng ({totalQty})
-        </div>
-      )}
     </div>
   )
 }
