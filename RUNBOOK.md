@@ -742,3 +742,257 @@ docker compose down -v --remove-orphans
 ---
 
 *Deployment ID: D1 (Docker Compose — 11 services) + D2 (Linux VM mTLS) | NT219 Capstone — UIT*
+# DEPLOY/D1 — Runbook
+**Đề tài:** Cloud API-Based Network Application Security for Small Company Services
+**Môn học:** NT219.Q21.ANTT — Mật mã học
+**Phiên bản Runbook:** 0.1-skeleton (tuần 2)
+**Trạng thái:** Draft — các mục đánh dấu `[TODO Week 3]` sẽ được điền đầy đủ ở tuần 3
+
+---
+
+## Mục lục
+
+1. [Bill of Materials (BOM)](#1-bill-of-materials-bom)
+2. [Trust Boundaries](#2-trust-boundaries)
+3. [Prerequisites & Checklist trước khi deploy](#3-prerequisites--checklist-trước-khi-deploy)
+4. [Quy trình khởi động (Startup Procedure)](#4-quy-trình-khởi-động-startup-procedure)
+5. [Smoke Test & Health Check](#5-smoke-test--health-check)
+6. [Rollback Procedure](#6-rollback-procedure)
+7. [Incident Response](#7-incident-response)
+8. [Maintenance & Key Rotation](#8-maintenance--key-rotation)
+
+---
+
+## 1. Bill of Materials (BOM)
+
+Danh sách đầy đủ tất cả services, image và version được sử dụng trong triển khai D1 (single-node Docker Compose).
+
+### 1.1 Core Infrastructure Services
+
+| Service | Docker Image | Version | Port (host→container) | Vai trò |
+|---------|-------------|---------|----------------------|---------|
+| **Kong Gateway** | `kong/kong-gateway` | `3.9.x` | `8000→8000`, `8443→8443`, `8001→8001` | API Gateway / PEP — cửa ngõ duy nhất từ client vào hệ thống |
+| **Keycloak** | `quay.io/keycloak/keycloak` | `26.x` | `8081→8080` | Identity Provider — OIDC, PKCE, TOTP, refresh token rotation |
+| **OPA** | `openpolicyagent/opa` | `0.71.x` | `8181→8181` | Policy Decision Point — đánh giá Rego, trả `{allow, reason}` |
+| **HashiCorp Vault** | `hashicorp/vault` | `1.18.x` | `8200→8200` | KMS — Transit Engine, envelope encryption DEK/KEK |
+| **PostgreSQL** | `postgres` | `16.x` | `5434→5432` | Relational DB — lưu ciphertext AEAD (KHÔNG lưu plaintext) |
+| **Redis** | `redis` | `7.x` | `6379→6379` | In-memory store — DPoP `jti` anti-replay với TTL |
+
+### 1.2 Application Services
+
+| Service | Image / Build | Version / Tag | Port | Vai trò |
+|---------|--------------|--------------|------|---------|
+| **FastAPI Backend** | `./backend` (build local) | `latest` / commit SHA | `9000→9000` | Business logic, DPoP verify, BOLA check, OPA client |
+| **React Frontend** | `./frontend` (build local) | `latest` / commit SHA | `5173→5173` | SPA — PKCE + DPoP, route guard theo role |
+
+### 1.3 Observability Stack
+
+| Service | Docker Image | Version | Port | Vai trò |
+|---------|-------------|---------|------|---------|
+| **Grafana** | `grafana/grafana` | `11.x` | `3000→3000` | Dashboard — metrics, log visualization |
+| **Loki** | `grafana/loki` | `3.x` | `3100→3100` | Log aggregation backend |
+| **Promtail** | `grafana/promtail` | `3.x` | — (internal) | Log shipper — thu thập log từ containers → Loki |
+
+### 1.4 Runtime Dependencies (trong container)
+
+| Dependency | Version | Dùng trong |
+|-----------|---------|-----------|
+| Python | `3.12.x` | FastAPI Backend |
+| FastAPI | `0.115.x` | FastAPI Backend |
+| `python-jose` | `3.x` | JWT RS256 verify |
+| `pyotp` | `2.x` | TOTP verify |
+| `cryptography` | `43.x` | AES-256-GCM / AEAD |
+| Node.js | `20.x LTS` | Frontend build (Vite) |
+| React | `18.x` | Frontend SPA |
+| Vite | `5.x` | Frontend bundler |
+| Lua | `5.1.x` (built-in Kong) | Kong custom plugins |
+
+---
+
+## 2. Trust Boundaries
+
+Hệ thống được chia thành **3 network zone** cô lập bằng Docker networks. Giao tiếp cross-zone đi qua các điểm kiểm soát rõ ràng — không có kết nối ngang (lateral) tùy ý.
+
+### 2.1 Sơ đồ tổng quan Trust Zones
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         INTERNET / USER BROWSER                      │
+│                     (Untrusted — Zero Trust Model)                   │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+        ┌───────────────────────┼────────────────────────┐
+        │                       │                        │
+   HTTPS :8000/:8443      HTTPS :8081               HTTP :5173
+     (API Gateway)        (Keycloak)              (Frontend SPA)
+        │                       │                        │
+        ▼                       ▼                        ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                         ZONE 1: edge-net (DMZ)                       │
+│                                                                      │
+│     ┌────────────┐      ┌────────────┐      ┌──────────────┐         │
+│     │ Frontend   │◄────►│   Kong     │◄────►│  Keycloak    │         │
+│     │  :5173     │      │  :8000     │      │   :8081      │         │
+│     └────────────┘      └────────────┘      └──────────────┘         │
+│                                                                      │
+│  Traffic Rules:                                                      │
+│  • Browser → Frontend   : Load SPA assets                            │
+│  • Browser → Kong       : ALL API requests                           │
+│  • Browser → Keycloak   : Login / Token refresh ONLY                 │
+│  • Kong → Keycloak      : Fetch JWKS for JWT verification            │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+                                │  Forward request (JWT + DPoP)
+                                │  (Internal traffic only)
+                                ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                    ZONE 2: internal-net (Private)                    │
+│                                                                      │
+│     ┌────────────┐        ┌──────────────┐                           │
+│     │   Kong     │───────►│   FastAPI    │                           │
+│     └────────────┘        │    :9000     │                           │
+│                           └──────┬───────┘                           │
+│                                  │                                   │
+│        ┌──────────────┬──────────┼──────────┬──────────────┐         │
+│        ▼              ▼          ▼          ▼              ▼         │
+│   ┌────────┐   ┌──────────┐ ┌────────┐ ┌────────────┐ ┌────────┐     │
+│   │  OPA   │   │  Vault   │ │Postgres│ │   Redis    │ │ (Other)│     
+│   │ :8181  │   │  :8200   │ │ :5432  │ │  :6379     │ │        │     │
+│   └────────┘   └──────────┘ └────────┘ └────────────┘ └────────┘     │
+│                                                                      │
+│  Internal Flows:                                                     │
+│  • Kong → FastAPI     : Forward validated request                    │
+│  • FastAPI → OPA      : AuthZ check {subject, action, resource}      │
+│  • FastAPI → Vault    : Encrypt / Decrypt sensitive data             │
+│  • FastAPI → Postgres : Store ciphertext ONLY                        │
+│  • FastAPI → Redis    : SET NX (jti) → Prevent DPoP replay           │
+│                                                                      │
+│(!) FastAPI :9000 MUST NOT be exposed publicly                        |
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+                                │  Logs collection (Promtail)
+                                ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                   ZONE 3: obs-net (Observability)                    │
+│                         (Isolated Network)                           │
+│                                                                      │
+│     ┌────────────┐      ┌────────────┐      ┌────────────┐           │
+│     │ Promtail   │─────►│    Loki    │─────►│  Grafana   │           │
+│     │            │      │   :3100    │      │   :3000    │           │
+│     └────────────┘      └────────────┘      └────────────┘           │
+│                                                                      │
+│  Observability Flow:                                                 │
+│  • Promtail → Loki   : Push logs from all containers                 │
+│  • Grafana → Loki    : Query logs / dashboards                       │
+│                                                                      │
+│      Grafana MUST be internal-only (no public exposure)              │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Ma trận giao tiếp (Communication Matrix)
+
+| Nguồn (Source) | Đích (Destination) | Cho phép? | Giao thức / Port | Ghi chú |
+|---------------|-------------------|-----------|-----------------|---------|
+| Browser | Kong | ✅ | HTTPS `:8000` / `:8443` | TLS 1.3, mọi API call |
+| Browser | Keycloak | ✅ | HTTPS `:8081` | Chỉ login flow / refresh token |
+| Browser | FastAPI | ❌ | — | Blocked — FastAPI chỉ nhận từ Kong |
+| Kong | FastAPI | ✅ | HTTP (internal-net) `:9000` | Sau khi pass JWT format check |
+| Kong | Keycloak | ✅ | HTTP (internal/edge) `:8080` | Lấy JWKS để verify RS256/kid |
+| Kong | OPA | ✅ | HTTP (internal-net) `:8181` | Plugin `opa-authz.lua` — PEP→PDP |
+| FastAPI | OPA | ✅ | HTTP (internal-net) `:8181` | Business-level authz query |
+| FastAPI | Vault | ✅ | HTTP (internal-net) `:8200` | Transit encrypt/decrypt DEK |
+| FastAPI | PostgreSQL | ✅ | TCP (internal-net) `:5432` | Chỉ ghi ciphertext |
+| FastAPI | Redis | ✅ | TCP (internal-net) `:6379` | DPoP jti `SET NX` với TTL |
+| OPA | bất kỳ | ❌ | — | OPA là passive PDP, không tự gọi ra ngoài |
+| Vault | bất kỳ | ❌ | — | Vault chỉ nhận request, không tự gọi |
+| Promtail | Loki | ✅ | HTTP (obs-net) `:3100` | Log shipping |
+| Grafana | Loki | ✅ | HTTP (obs-net) `:3100` | Log query |
+
+### 2.3 Nguyên tắc Trust Boundary
+
+- **Deny by default:** Mọi giao tiếp không được liệt kê trong bảng trên đều bị block ở tầng network (Docker network isolation).
+- **Kong là cửa ngõ duy nhất:** Mọi request từ client vào backend phải đi qua Kong. FastAPI `:9000` không bao giờ được expose trực tiếp ra internet.
+- **Keycloak chỉ tham gia lúc login:** Sau khi đã có access token, Keycloak không nằm trong luồng request thông thường. Kong chỉ cần lấy JWKS một lần và cache lại.
+- **OPA là passive:** OPA không tự kết nối ra ngoài — chỉ nhận query và trả về quyết định.
+- **Obs-net hoàn toàn tách biệt:** Stack observability không có đường vào internal-net hay edge-net.
+
+---
+
+## 3. Prerequisites & Checklist trước khi deploy
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- Yêu cầu phần cứng / OS tối thiểu
+- Docker Engine & Docker Compose version yêu cầu
+- File `.env` — các biến bắt buộc phải có trước khi chạy
+- Kiểm tra cert / TLS certs cho Kong
+- Checklist port conflict
+
+---
+
+## 4. Quy trình khởi động (Startup Procedure)
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- Thứ tự khởi động services (PostgreSQL → Vault → Keycloak → Kong → Backend → Frontend)
+- Vault unseal procedure (nếu không dùng dev mode)
+- Keycloak realm import (`realm-export.json`)
+- Seed data khởi tạo (`seed_data.py`)
+- Xác nhận 11 services `healthy`
+
+---
+
+## 5. Smoke Test & Health Check
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- `curl http://localhost:8000/health` qua Kong
+- Lấy token client_credentials và gọi API thử
+- Chạy `scripts/evaluation/` để verify 7 invariants (I1–I7)
+- Kiểm tra Grafana dashboard lên đủ data
+
+---
+
+## 6. Rollback Procedure
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- Rollback Docker image về tag trước
+- Restore PostgreSQL dump
+- Re-import Vault snapshot nếu key bị corrupt
+- Keycloak realm rollback
+
+---
+
+## 7. Incident Response
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- Phân loại sự cố (P1/P2/P3)
+- Quy trình ứng phó token leak
+- Quy trình ứng phó database breach (ciphertext exposed)
+- Liên hệ escalation
+
+---
+
+## 8. Maintenance & Key Rotation
+
+> **[TODO Week 3]** — Mục này sẽ được điền đầy đủ ở tuần 3.
+
+Placeholder nội dung dự kiến:
+- Vault Transit key rotation (`e_x1_rotation_test.sh`) — SLA ≤ 10 phút
+- Keycloak JWKS rotation
+- Redis TTL tuning cho DPoP jti
+- Log retention policy (Loki)
+
+---
+
+*Runbook này được duy trì bởi nhóm NT219.Q21.ANTT — lần cập nhật gần nhất: Tuần 2.*
