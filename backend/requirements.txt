@@ -12,3 +12,5 @@ pydantic==2.6.3
 pydantic-settings==2.2.1
 python-multipart==0.0.9
 hvac==2.1.0
+uvicorn[standard]
+faker

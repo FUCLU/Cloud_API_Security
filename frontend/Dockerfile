@@ -1,29 +1,22 @@
-# Stage 1: Build
 FROM node:20-alpine AS builder
-
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Cài tất cả dependencies (bao gồm devDependencies)
-RUN npm ci --include=dev
-
-# Copy source code
+RUN npm ci
 COPY . .
 
-# Build production
-RUN npx vite build
+ARG VITE_KEYCLOAK_URL
+ARG VITE_KONG_URL
+ARG VITE_REALM
+ARG VITE_CLIENT_ID
 
-# Stage 2: Serve với nginx
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
+ENV VITE_KONG_URL=$VITE_KONG_URL
+ENV VITE_REALM=$VITE_REALM
+ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
+
+RUN npm run build
+
 FROM nginx:alpine
-
-# Copy build output từ stage 1
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy nginx config nếu có
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
 EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]

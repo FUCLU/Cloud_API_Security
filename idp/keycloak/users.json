@@ -1,77 +1,27 @@
-{
-  "_comment": "File này document 3 test users đã được nhúng trong realm-export.json. Dùng để tham khảo hoặc import thủ công qua Keycloak Admin API.",
-
-  "realm": "lab",
-  "import_note": "Users đã được khai báo trong realm-export.json/users[]. File này là bản ghi tách riêng cho dễ đọc và CI/CD scripting.",
-
-  "users": [
-    {
-      "id": "user-admin-001",
-      "username": "phuc",
-      "email": "phuc@company.com",
-      "firstName": "Hồng Phúc",
-      "lastName": "Lưu",
-      "enabled": true,
-      "emailVerified": true,
-      "role": "admin",
-      "realmRoles": ["admin", "user"],
-      "password": "demo1234",
-      "mfa_required": true,
-      "attributes": {
-        "department": "engineering",
-        "employee_id": "EMP001"
-      },
-      "note": "Admin user — full access. TOTP bắt buộc trong production. Demo: nhập 6 số bất kỳ."
-    },
-    {
-      "id": "user-staff-001",
-      "username": "kiet",
-      "email": "kiet@company.com",
-      "firstName": "Tưởng Tuấn Kiệt",
-      "lastName": "Võ",
-      "enabled": true,
-      "emailVerified": true,
-      "role": "user",
-      "realmRoles": ["user"],
-      "password": "demo1234",
-      "mfa_required": false,
-      "attributes": {
-        "department": "operations",
-        "employee_id": "EMP002"
-      },
-      "note": "Staff user — có thể cập nhật đơn hàng và tồn kho, không thể xóa sản phẩm."
-    },
-    {
-      "id": "user-customer-001",
-      "username": "an",
-      "email": "an@gmail.com",
-      "firstName": "An",
-      "lastName": "Nguyễn",
-      "enabled": true,
-      "emailVerified": true,
-      "role": "user",
-      "realmRoles": ["user"],
-      "password": "demo1234",
-      "mfa_required": false,
-      "attributes": {
-        "department": "external",
-        "customer_id": "CUST001"
-      },
-      "note": "Customer user — chỉ xem sản phẩm, đặt hàng, xem đơn hàng của chính mình (BOLA protected)."
-    }
-  ],
-
-  "admin_api_import": {
-    "description": "Script import users thủ công qua Keycloak Admin REST API (nếu không dùng realm-export.json)",
-    "steps": [
-      "1. Lấy admin token:",
-      "   TOKEN=$(curl -s -X POST http://localhost:8081/realms/master/protocol/openid-connect/token -d 'client_id=admin-cli&username=admin&password=admin123&grant_type=password' | jq -r '.access_token')",
-      "2. Tạo user:",
-      "   curl -X POST http://localhost:8081/admin/realms/lab/users -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' -d '{...}'",
-      "3. Set password:",
-      "   curl -X PUT http://localhost:8081/admin/realms/lab/users/<userId>/reset-password -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' -d '{\"type\":\"password\",\"value\":\"demo1234\",\"temporary\":false}'",
-      "4. Assign role:",
-      "   curl -X POST http://localhost:8081/admin/realms/lab/users/<userId>/role-mappings/realm -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' -d '[{\"id\":\"role-admin\",\"name\":\"admin\"}]'"
-    ]
+[
+  {
+    "username": "admin",
+    "enabled": true,
+    "credentials": [
+      { "type": "password", "value": "demo1234" }
+    ],
+    "realmRoles": ["admin"],
+    "requiredActions": ["CONFIGURE_TOTP"]
+  },
+  {
+    "username": "user1",
+    "enabled": true,
+    "credentials": [
+      { "type": "password", "value": "demo1234" }
+    ],
+    "realmRoles": ["user"]
+  },
+  {
+    "username": "user2",
+    "enabled": true,
+    "credentials": [
+      { "type": "password", "value": "demo1234" }
+    ],
+    "realmRoles": ["user"]
   }
-}
+]

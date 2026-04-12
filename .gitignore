@@ -29,3 +29,6 @@ venv/
 
 # Database volumes
 postgres_data/
+
+
+llm.md
