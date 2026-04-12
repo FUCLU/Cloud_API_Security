@@ -30,7 +30,7 @@ jobs:
             EVIDENCE/security_scans/zap_report.html || true
 
       - name: Upload ZAP report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zap-report
           path: EVIDENCE/security_scans/zap_report.html
