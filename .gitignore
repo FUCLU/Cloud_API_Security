@@ -9,6 +9,7 @@ __pycache__/
 # ENV
 .env
 
+
 # Logs
 *.log
 
@@ -24,7 +25,7 @@ __pycache__/
 Thumbs.db
 
 # Python environments
-venv/
+.venv/
 .env/
 
 # Database volumes
