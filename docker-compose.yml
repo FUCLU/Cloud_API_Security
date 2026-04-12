@@ -157,6 +157,9 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: bundled
+      KONG_SSL_CERT: /certs/kong.crt
+      KONG_SSL_CERT_KEY: /certs/kong.key
+      KONG_SSL_PROTOCOLS: "TLSv1.3"
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -164,6 +167,7 @@ services:
     volumes:
       - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
       - ./gateway/plugins:/usr/local/kong/plugins
+      - ./certs:/certs:ro
     networks:
       - edge-net
       - internal-net
@@ -183,6 +187,9 @@ services:
         condition: service_healthy
     ports:
       - "5173:80"
+      - "5174:443" 
+    volumes:
+      - ./certs:/certs:ro 
     environment:
       - VITE_KEYCLOAK_URL=http://localhost:8081
       - VITE_KONG_URL=http://localhost:8000
@@ -191,7 +198,7 @@ services:
     networks:
       - edge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
+      test: ["CMD-SHELL", "curl -k https://localhost:443 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

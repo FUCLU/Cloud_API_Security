@@ -30,3 +30,12 @@ Thumbs.db
 
 # Database volumes
 postgres_data/
+
+# TLS Certs — tự generate bằng scripts/gen_certs.py
+certs/*.key
+certs/*.crt
+certs/*.csr
+certs/*.srl
+
+# Giữ lại script tạo cert
+!scripts/gen_certs.py

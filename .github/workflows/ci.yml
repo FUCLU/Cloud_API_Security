@@ -1,0 +1,43 @@
+name: CI - SAST & Secrets Scan
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install tools
+        run: pip install bandit detect-secrets
+
+      - name: Run Bandit SAST
+        run: |
+          bandit -r backend/ \
+            -f json \
+            -o EVIDENCE/security_scans/bandit_report.json \
+            --exit-zero
+
+      - name: Run detect-secrets
+        run: |
+          detect-secrets scan . \
+            --exclude-files '\.git' \
+            --exclude-files 'EVIDENCE/' \
+            > .secrets.baseline || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-report
+          path: EVIDENCE/security_scans/bandit_report.json

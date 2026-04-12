@@ -1,5 +1,5 @@
 {
-  "realm": "lab",
+  "realm": "cloudapi",
   "enabled": true,
   "displayName": "Lab Realm - NT219",
   "sslRequired": "external",
