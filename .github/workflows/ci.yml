@@ -37,7 +37,7 @@ jobs:
             > .secrets.baseline || true
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bandit-report
           path: EVIDENCE/security_scans/bandit_report.json
