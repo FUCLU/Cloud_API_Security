@@ -13,16 +13,14 @@ services:
     image: postgres:16
     container_name: api-postgres
     restart: always
-    environment:
-      POSTGRES_DB: cloudapi
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin123
+    env_file:
+      - .env
     ports:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - internal-net
+      - internal-net  
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d cloudapi"]
       interval: 10s
@@ -146,15 +144,16 @@ services:
         condition: service_healthy
     ports:
       - "9000:9000"
+    volumes:
+      - ./backend/app:/app/app
+    env_file:
+      - .env  
     environment:
-      DATABASE_URL: postgresql://admin:admin123@postgres:5432/cloudapi
       OPA_URL: http://opa:8181
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: root
       VAULT_KEY_NAME: dek
       REDIS_URL: redis://redis:6379
-      # DEK_BASE64: fallback khi Vault chưa init transit
-      # Generate bằng: python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
       DEK_BASE64: "MvJdAMNVYy1j4Ewb5fZ3h4pCxAfrYd+YC0QRrHATgH8="
     networks:
       - internal-net
