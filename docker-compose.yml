@@ -54,6 +54,8 @@ services:
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: root
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    volumes:
+      - ./vault/init:/vault/init
     networks:
       - internal-net
     healthcheck:
@@ -72,12 +74,14 @@ services:
       - "--addr=0.0.0.0:8181"
       - "--config-file=/config/opa-config.yaml"
       - "--set=decision_logs.console=true"
+      - "--set=decision_logs.plugins=print"
       - "/policies"
     ports:
       - "8181:8181"
     volumes:
       - ./opa/config:/config
       - ./opa/policies:/policies
+      - ./opa/tests:/tests
     networks:
       - internal-net
     healthcheck:
@@ -156,14 +160,16 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_PLUGINS: bundled
+      KONG_PLUGINS: bundled,opa-authz
+      #,jwt-hardening bổ sung vào KONG_PLUGINS sau
     ports:
       - "8000:8000"
       - "8443:8443"
       - "8001:8001"
     volumes:
       - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
-      - ./gateway/plugins:/usr/local/kong/plugins
+      # Mount thư mục opa-authz vào đúng vị trí lõi của Lua trong Kong
+      - ./gateway/plugins/opa-authz:/usr/local/share/lua/5.1/kong/plugins/opa-authz
     networks:
       - edge-net
       - internal-net
@@ -205,6 +211,7 @@ services:
       - "3100:3100"
     volumes:
       - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - ./observability/loki/rules:/etc/loki/rules
     command: -config.file=/etc/loki/loki-config.yml
     networks:
       - obs-net
