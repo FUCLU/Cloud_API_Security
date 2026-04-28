@@ -177,7 +177,7 @@ export default function AdminDashboard() {
                   {[
                     {av:'LP',name:'Lưu Hồng Phúc', role:'admin',    mfa:'WebAuthn', color:'#c84b2f'},
                     {av:'PH',name:'Phan Thái Hưng', role:'admin',    mfa:'TOTP',     color:'#1e4e7a'},
-                    {av:'VK',name:'Võ Tuấn Kiệt',   role:'staff',    mfa:'TOTP',     color:'#2a6049'},
+                    {av:'VK',name:'Võ Tuấn Tuấn Kiệt',   role:'staff',    mfa:'TOTP',     color:'#2a6049'},
                     {av:'NA',name:'Nguyễn Văn An',  role:'customer', mfa:'TOTP',     color:'#5a2d9a'},
                   ].map(u => (
                     <div key={u.av} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 0',borderBottom:'1px solid var(--cream)'}}>

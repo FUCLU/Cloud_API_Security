@@ -1,50 +1,94 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+
+import { AuthProvider } from './auth/AuthProvider'
+import PrivateRoute from './auth/PrivateRoute'
+import CallbackPage from './pages/CallbackPage'
+
 import Login from './pages/auth/Login'
 
+// Layouts 
 import AdminLayout from './layouts/AdminLayout'
+import StaffLayout from './layouts/StaffLayout'
+import CustomerLayout from './layouts/CustomerLayout'
+
+// Admin pages
 import AdminDashboard from './pages/admin/Dashboard'
-import AdminOrders from './pages/admin/Orders'
+import AdminUsers from './pages/admin/UserManagement'
 import AdminProducts from './pages/admin/Products'
+import AdminOrders from './pages/admin/Orders'
 import SystemSettings from './pages/admin/SystemSettings'
-import UserManagement from './pages/admin/UserManagement'
 import AttackSimulation from './pages/admin/AttackSimulation'
 
-import CustomerLayout from './layouts/CustomerLayout'
-import MyOrders from './pages/customer/MyOrders'
-import ProductCatalog from './pages/customer/ProductCatalog'
-import Profile from './pages/customer/Profile'
-
-import StaffLayout from './layouts/StaffLayout'
+// Staff pages
 import StaffDashboard from './pages/staff/Dashboard'
-import StaffOrders from './pages/staff/Orders'
 import StaffProducts from './pages/staff/Products'
+import StaffOrders from './pages/staff/Orders'
+
+// Customer pages
+import ProductCatalog from './pages/customer/ProductCatalog'
+import MyOrders from './pages/customer/MyOrders'
+import Profile from './pages/customer/Profile'
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="products" element={<AdminProducts />} />
-          <Route path="settings" element={<SystemSettings />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="attacks" element={<AttackSimulation />} />
-        </Route>
-        <Route path="/staff" element={<StaffLayout />}>
-          <Route path="dashboard" element={<StaffDashboard />} />
-          <Route path="orders" element={<StaffOrders />} />
-          <Route path="products" element={<StaffProducts />} />
-        </Route>
-        <Route path="/customer" element={<CustomerLayout />}>
-          <Route path="myorders" element={<MyOrders />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="productcatalog" element={<ProductCatalog />} />
-        </Route>
-      </Routes>
+      <AuthProvider>
+        <Routes>
+
+          {/* PUBLIC */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/callback" element={<CallbackPage />} />
+          <Route path="/unauthorized" element={<div>403 - No access</div>} />
+
+          {/* ADMIN + LAYOUT */}
+          <Route
+            path="/admin"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="products" element={<AdminProducts />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="settings" element={<SystemSettings />} />
+            <Route path="attacks" element={<AttackSimulation />} />
+          </Route>
+
+          {/* STAFF + LAYOUT */}
+          <Route
+            path="/staff"
+            element={
+              <PrivateRoute roles={['staff', 'admin']}>
+                <StaffLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route path="dashboard" element={<StaffDashboard />} />
+            <Route path="products" element={<StaffProducts />} />
+            <Route path="orders" element={<StaffOrders />} />
+          </Route>
+
+          {/* CUSTOMER + LAYOUT */}
+          <Route
+            path="/customer"
+            element={
+              <PrivateRoute>
+                <CustomerLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route path="productcatalog" element={<ProductCatalog />} />
+            <Route path="myorders" element={<MyOrders />} />
+            <Route path="profile" element={<Profile />} />
+          </Route>
+
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

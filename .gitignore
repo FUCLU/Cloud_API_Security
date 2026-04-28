@@ -39,3 +39,6 @@ certs/*.srl
 
 # Giữ lại script tạo cert
 !scripts/gen_certs.py
+
+
+

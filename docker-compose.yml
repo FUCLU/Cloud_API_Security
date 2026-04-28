@@ -62,6 +62,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Vault init: enable transit engine + tạo key "dek" ---
+  # Chạy 1 lần, tự exit sau khi xong
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: vault-init
+    restart: "no"
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        vault secrets enable transit || true
+        vault write -f transit/keys/dek
+        echo "✅ Vault transit + key 'dek' ready"
+    networks:
+      - internal-net
+
   opa:
     image: openpolicyagent/opa:0.65.0
     container_name: opa
@@ -130,11 +151,15 @@ services:
       OPA_URL: http://opa:8181
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: root
+      VAULT_KEY_NAME: dek
       REDIS_URL: redis://redis:6379
+      # DEK_BASE64: fallback khi Vault chưa init transit
+      # Generate bằng: python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
+      DEK_BASE64: "MvJdAMNVYy1j4Ewb5fZ3h4pCxAfrYd+YC0QRrHATgH8="
     networks:
       - internal-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/health || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -180,6 +205,12 @@ services:
   frontend:
     build:
       context: ./frontend
+      # VITE_* phải truyền qua build args, không phải environment
+      args:
+        VITE_KEYCLOAK_URL: "http://localhost:8081"
+        VITE_KONG_URL: "http://localhost:8000"
+        VITE_REALM: "cloudapi"
+        VITE_CLIENT_ID: "spa-client"
     container_name: api-frontend
     restart: always
     depends_on:
@@ -274,3 +305,5 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin
     networks:
       - internal-net
+
+
