@@ -996,3 +996,69 @@ Placeholder nội dung dự kiến:
 ---
 
 *Runbook này được duy trì bởi nhóm NT219.Q21.ANTT — lần cập nhật gần nhất: Tuần 2.*
+
+# DEPLOY/D1/Runbook.md — Hướng dẫn triển khai Local (Docker Compose)
+
+## 1. Prerequisites
+- OS: Linux / macOS / Windows 10+ (Docker Desktop)
+- Docker Engine ≥ 24.0
+- Docker Compose V2
+- Git
+- Ít nhất 8GB RAM
+
+## 2. BOM — Bill of Materials
+| Service          | Container       | Image/Version                        | Ports                  |
+|------------------|-----------------|--------------------------------------|------------------------|
+| Frontend         | api-frontend    | Vite + React (custom)                | 5173                   |
+| Kong Gateway     | api-gateway     | kong/kong:3.8                        | 8000, 8443, 8001       |
+| Keycloak         | keycloak        | quay.io/keycloak/keycloak:25         | 8081                   |
+| FastAPI Backend  | api-backend     | Python 3.12 + FastAPI (custom)       | 9000 (internal)        |
+| OPA              | opa             | openpolicyagent/opa:0.68             | 8181                   |
+| Vault            | vault           | hashicorp/vault:1.17                 | 8200                   |
+| PostgreSQL       | api-postgres    | postgres:16-alpine                   | 5434 → 5432            |
+| Redis            | api-redis       | redis:7-alpine                       | 6379                   |
+| Grafana          | grafana         | grafana/grafana:11                   | 3000                   |
+| Loki             | loki            | grafana/loki:3                       | 3100                   |
+| Promtail         | promtail        | grafana/promtail:3                   | -                      |
+
+## 3. Network diagram & Trust Boundaries
+Browser/SPA (PKCE + DPoP)
+↓ (edge-net)
+Kong Gateway (PEP: JWT, rate-limit, Lua plugins)
+↓ (internal-net)
+FastAPI Backend → OPA (PDP) → Vault (Transit) → PostgreSQL (AEAD)
+Redis (DPoP jti)
+Keycloak (IdP - chỉ login)
+Observability (obs-net)
+text**Trust Boundaries**: Tất cả traffic phải đi qua Kong. Backend không expose trực tiếp.
+
+## 4. Cách chạy
+```bash
+git clone https://github.com/FUCLU/Cloud_API_Security.git
+cd Cloud_API_Security
+cp .env.example .env          # Điền các secret
+docker compose up -d --build
+5. Verify checklist sau khi up
+
+curl http://localhost:8000/health → OK
+ Truy cập http://localhost:9000/docs → thấy users, products, orders
+ Tạo user mới và kiểm tra persist sau docker compose restart backend
+ BOLA test: user A không xem được order của user B → 403
+ Webhook HMAC test
+
+6. Cấu hình secrets
+
+Sử dụng file .env (không hardcode)
+Quan trọng: DATABASE_URL, WEBHOOK_SECRET, VAULT_TOKEN, REDIS_PASSWORD
+Inject qua environment: trong docker-compose.yml
+
+7. Troubleshooting thường gặp
+
+404 route → kiểm tra main.py include router + restart backend
+File 0 byte trong container → docker compose build backend --no-cache
+Import error → kiểm tra __init__.py và volume mount
+CORS error → kiểm tra middleware trong main.py
+
+8. Cách dừng và dọn dẹp
+Bashdocker compose down                  # Chỉ dừng
+docker compose down -v --remove-orphans   # Dừng + xóa volume (reset DB)
