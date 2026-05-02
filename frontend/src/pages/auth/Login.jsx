@@ -1,38 +1,56 @@
-import React, { useState } from 'react'
-import '../../styles/login.css'
+﻿import React, { useState } from 'react'
 import logo from '../../../src/logo.png'
-import { login as kcLogin } from '../../auth/keycloak'
-
-const ACCOUNTS = {
-  'phuc@company.com': { role: 'admin',    mfa: true,  name: 'Lưu Hồng Phúc' },
-  'hung@company.com': { role: 'admin',    mfa: true,  name: 'Phan Thái Hưng' },
-  'kiet@company.com': { role: 'staff',    mfa: true,  name: 'Võ Tưởng Tuấn Kiệt' },
-  'an@gmail.com':     { role: 'customer', mfa: false, name: 'Nguyễn Văn An' },
-  'bich@gmail.com':   { role: 'customer', mfa: false, name: 'Trần Thị Bích' },
-}
+import '../../styles/login.css'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function Login() {
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('demo1234')
-  const [loading,  setLoading]  = useState(false)
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const { login, loginWithGoogle, resetAuth } = useAuth()
 
   function fillDemo(demoEmail) {
     setEmail(demoEmail)
-    setPassword('demo1234')
+    setError(null)
   }
 
-
-  function doLogin() {
-    if (!email || !password) return
+  async function doKeycloakLogin() {
     setLoading(true)
-    // Keycloak sẽ tự handle: login form → TOTP (nếu admin) → redirect /callback
-    kcLogin()
-    // setLoading sẽ không cần reset vì browser redirect luôn
+    setError(null)
+
+    resetAuth()
+    sessionStorage.removeItem('pkce_verifier')
+    sessionStorage.removeItem('pkce_state')
+    if (email) sessionStorage.setItem('expected_login_email', email.toLowerCase())
+    else sessionStorage.removeItem('expected_login_email')
+
+    try {
+      await login({ loginHint: email || '', prompt: 'login' })
+    } catch (err) {
+      setError(err?.message ?? 'Khong the chuyen huong dang nhap Keycloak')
+      setLoading(false)
+    }
+  }
+
+  async function doGoogleLogin() {
+    setLoading(true)
+    setError(null)
+
+    resetAuth()
+    sessionStorage.removeItem('pkce_verifier')
+    sessionStorage.removeItem('pkce_state')
+    sessionStorage.removeItem('expected_login_email')
+
+    try {
+      await loginWithGoogle()
+    } catch (err) {
+      setError(err?.message ?? 'Khong the dang nhap Google')
+      setLoading(false)
+    }
   }
 
   return (
     <div className="login-page">
-      {/* LEFT — giữ nguyên */}
       <div className="left">
         <div className="left-content">
           <div className="brand">
@@ -42,16 +60,14 @@ export default function Login() {
             </div>
           </div>
           <div className="hero">
-            <h1>Mua sắm thả ga,<br /> giao hàng tận nhà</h1>
+            <h1>Mua sắm thả ga<br /> giao hàng tận nhà</h1>
           </div>
         </div>
       </div>
 
-      {/* RIGHT */}
       <div className="right">
         <div className="form-wrap">
           <div className="form-title">Đăng nhập</div>
-          <div className="form-sub">Nhập thông tin tài khoản của bạn.</div>
 
           <div className="field">
             <label>Email</label>
@@ -61,64 +77,55 @@ export default function Login() {
               value={email}
               onChange={e => setEmail(e.target.value)}
             />
-            <div className="field-hint">Email công ty hoặc cá nhân đã đăng ký</div>
           </div>
 
-          <div className="field">
-            <label>Mật khẩu</label>
-            <input
-              type="password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && doLogin()}
-            />
-          </div>
+          {error && (
+            <div style={{
+              padding: '8px 12px', marginBottom: 8,
+              background: '#fef2f2', border: '1px solid #fca5a5',
+              borderRadius: 7, fontSize: 13, color: '#b91c1c'
+            }}>
+              {error}
+            </div>
+          )}
 
-          <div className="forgot"><a href="#">Quên mật khẩu?</a></div>
-
-          <button className="btn-main" onClick={doLogin} disabled={loading}>
-            {loading
-              ? <span style={{ display: 'flex' }}><div className="spinner"></div></span>
-              : <span>Đăng nhập</span>
-            }
+          <button className="btn-main" onClick={doKeycloakLogin} disabled={loading}>
+            {loading ? 'Đang chuyển hướng...' : 'Đăng nhập'}
           </button>
 
-          {/* Thông báo Keycloak */}
-          <div style={{
-            marginTop: 12,
-            padding: '8px 12px',
-            background: '#f0f4ff',
-            border: '1px solid #c5d3f5',
-            borderRadius: 7,
-            fontSize: 12,
-            color: '#3a5bb5',
-            lineHeight: 1.6
-          }}>
-            🔐 Bạn sẽ được chuyển đến trang đăng nhập bảo mật.<br />
-            Admin sẽ yêu cầu nhập mã <strong>TOTP</strong> sau khi xác thực.
+          <div style={{ textAlign: 'center', margin: '12px 0', color: 'var(--muted)', fontSize: 12 }}>
+            hoặc
           </div>
 
-          {/* Demo accounts — giữ nguyên */}
+          <button
+            className="btn-google"
+            onClick={doGoogleLogin}
+            disabled={loading}
+            style={{
+              width: '100%', padding: '10px 0',
+              border: '1px solid #dadce0', borderRadius: 8,
+              background: '#fff', cursor: 'pointer',
+              fontSize: 14, fontWeight: 500,
+            }}
+          >
+            Đăng nhập với google
+          </button>
+
           <div className="demo-box">
-            <div className="demo-label">Tài khoản demo — chọn để điền tự động</div>
+            <div className="demo-label">Tài khoản demo - Chọn để đăng nhập</div>
             <div className="demo-item" onClick={() => fillDemo('phuc@company.com')}>
               <span className="demo-role" style={{ background: '#fcecea', color: 'var(--accent)' }}>Admin</span>
               <span>phuc@company.com</span>
-              <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--muted)', background: 'var(--cream)', padding: '2px 6px', borderRadius: '4px' }}>MFA</span>
             </div>
             <div className="demo-item" onClick={() => fillDemo('kiet@company.com')}>
               <span className="demo-role" style={{ background: '#e6eef6', color: '#1e4e7a' }}>Staff</span>
               <span>kiet@company.com</span>
-              <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--muted)', background: 'var(--cream)', padding: '2px 6px', borderRadius: '4px' }}>MFA</span>
             </div>
             <div className="demo-item" onClick={() => fillDemo('an@gmail.com')}>
               <span className="demo-role" style={{ background: 'var(--cream)', color: 'var(--muted)' }}>Customer</span>
               <span>an@gmail.com</span>
-              <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--muted)', background: 'var(--cream)', padding: '2px 6px', borderRadius: '4px' }}>Tuỳ chọn</span>
             </div>
           </div>
-
         </div>
       </div>
     </div>

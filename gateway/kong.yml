@@ -2,38 +2,49 @@ _format_version: "3.0"
 
 services:
   - name: backend-service
-    # tên service, dùng để tham chiếu
-    url: http://backend:9000
-    # Kong forward request đến địa chỉ này
-    # "backend" là tên container trong docker-compose
+    url: http://api-backend:9000
 
     routes:
       - name: users-route
-        paths: ["/api/v1/users"]
-        # request vào /api/v1/users → forward đến backend
+        paths:
+          - /api/v1/users
+        strip_path: false
 
       - name: products-route
-        paths: ["/api/v1/products"]
+        paths:
+          - /api/v1/products
+        strip_path: false
 
       - name: orders-route
-        paths: ["/api/v1/orders"]
+        paths:
+          - /api/v1/orders
+        strip_path: false
+
+      - name: auth-route
+        paths:
+          - /api/v1/auth
+        strip_path: false
 
       - name: health-route
-        paths: ["/health"]
-        # health check không cần auth
+        paths:
+          - /health
+
+      - name: root-route
+        paths:
+          - /
 
 plugins:
-  # Plugin 1: JWT verify - kiểm tra token hợp lệ
-  - name: jwt
-    config:
-      key_claim_name: kid
-      # lấy kid từ JWT header để tìm đúng key
-      claims_to_verify:
-        - exp
-        # kiểm tra token chưa hết hạn
-      secret_is_base64: false
+  # JWT verification is handled dynamically in backend/app/security/jwt_verify.py
+  # to avoid static key/kid pinning in Kong.
 
-  # Plugin 2: CORS - cho phép browser gọi API
+  - name: jwt-hardening
+
+  - name: hsts-header
+
+  - name: opa-authz
+    config:
+      opa_url: "http://opa:8181/v1/data/authz"
+
   - name: cors
     config:
       origins:
@@ -51,14 +62,11 @@ plugins:
         - Content-Type
       credentials: true
 
-  # Plugin 3: Rate limiting - chặn spam request
   - name: rate-limiting
     config:
       minute: 100
-      # tối đa 100 request/phút mỗi IP
       policy: local
 
-  # Plugin 4: Response headers bảo mật
   - name: response-transformer
     config:
       add:

@@ -1,13 +1,3 @@
-"""
-backend/app/security/aead_encryption.py
-
-Fix so với bản gốc:
-- Thêm load_dek_from_env() alias để seed_data.py không bị ImportError
-- Thêm get_dek_from_vault() dùng Vault Transit (dùng khi Vault available)
-- Hàm load_dek() giữ nguyên (đọc DEK_BASE64 từ env)
-- Tất cả tên hàm đồng nhất
-"""
-
 import os
 import base64
 import logging
@@ -20,10 +10,6 @@ logger = logging.getLogger(__name__)
 VAULT_ADDR = os.getenv("VAULT_ADDR", "http://vault:8200")
 VAULT_TOKEN = os.getenv("VAULT_TOKEN", "root")
 VAULT_KEY_NAME = os.getenv("VAULT_KEY_NAME", "dek")
-
-
-# ─── DEK loaders ─────────────────────────────────────────────────────────────
-
 
 def load_dek() -> bytes:
     """

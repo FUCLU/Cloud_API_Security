@@ -1,6 +1,7 @@
 {
   "realm": "cloudapi",
   "enabled": true,
+  "defaultSignatureAlgorithm": "ES256",
 
   "requiredActions": [
     {
@@ -40,6 +41,7 @@
       { "name": "customer", "description": "Own data only" }
     ]
   },
+  "defaultRoles": ["customer"],
 
   "clients": [
     {
@@ -47,19 +49,24 @@
       "publicClient": true,
       "protocol": "openid-connect",
       "redirectUris": [
+        "http://localhost:5173/*",
         "http://localhost:5174/*",
         "https://localhost:5174/*"
       ],
       "webOrigins": [
+        "http://localhost:5173",
         "http://localhost:5174",
         "https://localhost:5174"
       ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "dpop.bound.access.tokens": "true",
+        "access.token.signed.response.alg": "ES256",
+        "id.token.signed.response.alg": "ES256"
       },
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": true
     },
     {
       "clientId": "backend-client",
@@ -71,10 +78,41 @@
     }
   ],
 
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": true,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "config": {
+        "clientId": "679393827886-fnimrsjluoue2n568kn0nfqt5jpmt7ip.apps.googleusercontent.com",
+        "clientSecret": "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",
+        "useJwksUrl": "true",
+        "defaultScope": "openid profile email"
+      }
+    }
+  ],
+
   "users": [
     {
       "username": "phuc@company.com",
       "email": "phuc@company.com",
+      "enabled": true,
+      "credentials": [
+        { "type": "password", "value": "demo1234", "temporary": false }
+      ],
+      "realmRoles": ["admin"],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    },
+    {
+      "username": "hung@company.com",
+      "email": "hung@company.com",
       "enabled": true,
       "credentials": [
         { "type": "password", "value": "demo1234", "temporary": false }
@@ -101,6 +139,40 @@
       ],
       "realmRoles": ["customer"],
       "requiredActions": []
+    },
+    {
+      "username": "bich@gmail.com",
+      "email": "bich@gmail.com",
+      "enabled": true,
+      "credentials": [
+        { "type": "password", "value": "demo1234", "temporary": false }
+      ],
+      "realmRoles": ["customer"],
+      "requiredActions": []
     }
-  ]
+  ],
+  
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "ecdsa-generated",
+        "providerId": "ecdsa-generated",
+        "subComponents": {},
+        "config": {
+          "priority": [
+            "100"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "active": [
+            "true"
+          ],
+          "ecdsaCurve": [
+            "P-256"
+          ]
+        }
+      }
+    ]
+  }
 }

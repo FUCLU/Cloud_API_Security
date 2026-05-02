@@ -1,35 +1,133 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: info
 
 positions:
   filename: /tmp/positions.yaml
+  sync_period: 10s
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
+    tenant_id: observability
 
 scrape_configs:
   - job_name: docker
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
+    
     relabel_configs:
+      # Extract container name
       - source_labels: [__meta_docker_container_name]
         regex: '/(.*)'
         target_label: container
+      
+      # Map container name to service name using a single regex
       - source_labels: [__meta_docker_container_name]
-        regex: '/api-gateway'
+        regex: '.*(kong|api-gateway).*'
+        action: replace
+        replacement: 'kong'
         target_label: service
-        replacement: kong
+      
       - source_labels: [__meta_docker_container_name]
-        regex: '/api-backend'
+        regex: '.*(fastapi|api-backend).*'
+        action: replace
+        replacement: 'fastapi'
         target_label: service
-        replacement: fastapi
+      
       - source_labels: [__meta_docker_container_name]
-        regex: '/opa'
+        regex: '.*opa.*'
+        action: replace
+        replacement: 'opa'
         target_label: service
-        replacement: opa
+      
       - source_labels: [__meta_docker_container_name]
-        regex: '/keycloak'
+        regex: '.*keycloak.*'
+        action: replace
+        replacement: 'keycloak'
         target_label: service
-        replacement: keycloak
+      
+      - source_labels: [__meta_docker_container_name]
+        regex: '.*(postgres|postgresql).*'
+        action: replace
+        replacement: 'postgres'
+        target_label: service
+      
+      - source_labels: [__meta_docker_container_name]
+        regex: '.*redis.*'
+        action: replace
+        replacement: 'redis'
+        target_label: service
+      
+      - source_labels: [__meta_docker_container_name]
+        regex: '.*loki.*'
+        action: replace
+        replacement: 'loki'
+        target_label: service
+      
+      - source_labels: [__meta_docker_container_name]
+        regex: '.*grafana.*'
+        action: replace
+        replacement: 'grafana'
+        target_label: service
+      
+      - source_labels: [__meta_docker_container_name]
+        regex: '.*vault.*'
+        action: replace
+        replacement: 'vault'
+        target_label: service
+      
+      # Get project name
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        target_label: project
+    
+    pipeline_stages:
+      # Multiline parsing for stacktraces and JSON
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}T|^Traceback|^{|^\[|^\w+\s+\d{2}:\d{2}:\d{2}'
+          max_lines: 128
+          timeout: 5s
+      
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+      
+      # Parse text-format logs
+      - regex:
+          expression: '(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)\s+(?P<level>\w+)\s+(?P<message>.*)'
+      
+      # Create searchable labels
+      - labels:
+          level:
+          request_id:
+          event_type:
+      
+      # Stage 5: Format lại message (bỏ trùng lặp)
+      - output:
+          source: message
+  
+  # FILE LOGS (nếu có file logs từ host)
+  - job_name: application-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: app-logs
+          __path__: /logs/**/*.log
+    
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_lines: 100
+          timeout: 5s
+      
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            service: service

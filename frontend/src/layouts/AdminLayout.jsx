@@ -1,9 +1,10 @@
-import React from 'react'
+﻿import React from 'react'
 import logo from '../../src/logo.png'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
 export default function AdminLayout() {
-  const navigate = useNavigate()
+  const { logout } = useAuth()
 
   return (
     <>
@@ -16,28 +17,28 @@ export default function AdminLayout() {
           </div>
         </div>
         <div className="sb-nav">
-          <div className="sb-section">Tổng quan</div>
+          <div className="sb-section">Tong quan</div>
           <NavLink to="/admin/dashboard" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">◈</span>Dashboard
           </NavLink>
 
           <div className="sb-section">Kinh doanh</div>
           <NavLink to="/admin/products" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
-            <span className="sb-icon">▣</span>Sản phẩm
+            <span className="sb-icon">▣</span>San pham
           </NavLink>
           <NavLink to="/admin/orders" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
-            <span className="sb-icon">◎</span>Đơn hàng
+            <span className="sb-icon">◎</span>Don hang
           </NavLink>
 
-          <div className="sb-section">Hệ thống</div>
+          <div className="sb-section">He thong</div>
           <NavLink to="/admin/users" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
-            <span className="sb-icon">◉</span>Người dùng
+            <span className="sb-icon">◉</span>Nguoi dung
           </NavLink>
           <NavLink to="/admin/settings" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
-            <span className="sb-icon">⊙</span>Cài đặt hệ thống
+            <span className="sb-icon">⊙</span>Cai dat he thong
           </NavLink>
 
-          <div className="sb-section">Bảo mật</div>
+          <div className="sb-section">Bao mat</div>
           <NavLink to="/admin/attacks" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
             <span className="sb-icon">⚡</span>Attack Simulation
             <span className="sb-badge" style={{ background:'#c84b2f' }}>Lab</span>
@@ -46,12 +47,12 @@ export default function AdminLayout() {
 
         <div className="sb-footer">
           <div className="sb-user">
-            <div className="sb-avatar" style={{ background: '#c84b2f' }}>LP</div>
+            <div className="sb-avatar" style={{ background: '#c84b2f' }}>AD</div>
             <div>
-              <div className="sb-uname">Lưu Hồng Phúc</div>
-              <div className="sb-urole">Administrator</div>
+              <div className="sb-uname">Administrator</div>
+              <div className="sb-urole">Admin</div>
             </div>
-            <button className="sb-logout" onClick={() => navigate('/login')}>↩</button>
+            <button className="sb-logout" onClick={logout}>↩</button>
           </div>
         </div>
       </nav>

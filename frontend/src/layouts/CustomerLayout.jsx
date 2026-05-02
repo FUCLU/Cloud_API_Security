@@ -1,9 +1,10 @@
-import React from 'react'
+﻿import React from 'react'
 import logo from '../../src/logo.png'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
 export default function CustomerLayout() {
-  const navigate = useNavigate()
+  const { logout } = useAuth()
 
   return (
     <div className="main-full">
@@ -13,17 +14,17 @@ export default function CustomerLayout() {
         </div>
         <div className="nav-links">
           <NavLink to="/customer/productcatalog" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-            Sản phẩm
+            San pham
           </NavLink>
           <NavLink to="/customer/myorders" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-            Đơn của tôi
+            Don cua toi
           </NavLink>
           <NavLink to="/customer/profile" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-            Tài khoản
+            Tai khoan
           </NavLink>
         </div>
         <div className="nav-right">
-          <div className="tb-icon" onClick={() => navigate('/login')} style={{ cursor:'pointer' }} title="Đăng xuất">↩</div>
+          <div className="tb-icon" onClick={logout} style={{ cursor:'pointer' }} title="Dang xuat">↩</div>
         </div>
       </nav>
       <Outlet />

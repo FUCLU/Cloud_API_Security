@@ -1,0 +1,33 @@
+groups:
+  - name: security-alerts
+    interval: 1m
+    rules:
+      - alert: FailedAuthHigh
+        expr: sum(count_over_time({service="keycloak"} |= "LOGIN_ERROR" [1m])) > 10
+        for: 0m
+        labels:
+          severity: warning
+          source: loki
+        annotations:
+          summary: "failed_auth > 10/min"
+          description: "Login failures exceeded 10 in the last minute."
+
+      - alert: AlgNoneAttemptDetected
+        expr: sum(count_over_time({service=~"kong|fastapi"} |= "alg_none" [1m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          source: loki
+        annotations:
+          summary: "alg_none_attempt > 0"
+          description: "JWT alg=none attack attempt detected."
+
+      - alert: AEADErrorDetected
+        expr: sum(count_over_time({service="fastapi"} |= "aead_error" [1m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          source: loki
+        annotations:
+          summary: "aead_error > 0"
+          description: "AEAD integrity/decryption error detected."

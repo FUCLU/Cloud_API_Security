@@ -6,11 +6,12 @@ import PrivateRoute from './auth/PrivateRoute'
 import CallbackPage from './pages/CallbackPage'
 
 import Login from './pages/auth/Login'
+import Unauthorized from './pages/Unauthorized'
 
 // Layouts 
 import AdminLayout from './layouts/AdminLayout'
 import StaffLayout from './layouts/StaffLayout'
-import CustomerLayout from './layouts/CustomerLayout'
+import CustomerLayout from './layouts/CustomerLayout' 
 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard'
@@ -40,7 +41,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<CallbackPage />} />
-          <Route path="/unauthorized" element={<div>403 - No access</div>} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* ADMIN + LAYOUT */}
           <Route
@@ -77,7 +78,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <PrivateRoute>
+              <PrivateRoute roles={['customer']}>
                 <CustomerLayout />
               </PrivateRoute>
             }

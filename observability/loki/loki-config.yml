@@ -3,14 +3,15 @@ auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
+  log_level: info
 
 common:
   instance_addr: 127.0.0.1
-  path_prefix: /tmp/loki
+  path_prefix: /loki                           # ⭐ Dùng /loki (mount volume persistent)
   storage:
     filesystem:
-      chunks_directory: /tmp/loki/chunks
-      rules_directory: /tmp/loki/rules
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
   replication_factor: 1
   ring:
     kvstore:
@@ -35,9 +36,20 @@ schema_config:
 
 limits_config:
   reject_old_samples: false
-  reject_old_samples_max_age: 168h
-  ingestion_rate_mb: 16
-  ingestion_burst_size_mb: 32
+  reject_old_samples_max_age: 720h             # 30 ngày
+  ingestion_rate_mb: 32                        # 32MB/s (tăng để xử lý nhiều logs)
+  ingestion_burst_size_mb: 64
+  max_query_lookback: 0
+
+ingester:
+  max_chunk_age: 1h
+  chunk_idle_period: 3m
 
 ruler:
+  enable_api: true
+  rule_path: /loki/rules
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
   alertmanager_url: http://localhost:9093

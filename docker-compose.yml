@@ -1,28 +1,39 @@
+# Cách chạy:
+#   Toàn bộ hệ thống:    docker compose up -d
+#   Kèm dev tools:       docker compose --profile tools up -d
+#   Kèm observability:   docker compose --profile obs up -d
+#   Tất cả:              docker compose --profile tools --profile obs up -d
+
+
 networks:
-  edge-net:
-  internal-net:
-  obs-net:
+  edge-net:       # Tầng ngoài: frontend, kong, keycloak tiếp nhận traffic
+  internal-net:   # Tầng trong: backend, db, cache, vault, opa — không expose ra ngoài
+  obs-net:        # Tầng quan sát: loki, promtail, grafana tách biệt
 
 volumes:
   postgres_data:
   grafana_data:
+  loki_data:
+
+
+# TẦNG 1 — HẠ TẦNG (Infrastructure)
+# postgres, redis, vault
 
 services:
 
   postgres:
     image: postgres:16
     container_name: api-postgres
-    restart: always
-    env_file:
-      - .env
+    restart: unless-stopped
+    env_file: .env                        # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
     ports:
-      - "5434:5432"
+      - "${POSTGRES_PORT:-5434}:5432"     # chỉ dùng port này để kết nối từ máy host khi dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - internal-net  
+      - internal-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d cloudapi"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,9 +41,9 @@ services:
   redis:
     image: redis:7
     container_name: api-redis
-    restart: always
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6380}:6379"
     networks:
       - internal-net
     healthcheck:
@@ -41,17 +52,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Vault chạy dev mode — KHÔNG dùng cho production
+  # Dev mode: dữ liệu không persist, tự unseal, token = root
   vault:
     image: hashicorp/vault:1.15
     container_name: vault
-    restart: always
+    restart: unless-stopped
     cap_add:
       - IPC_LOCK
     ports:
       - "8200:8200"
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN}
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    volumes:
+      - ./vault/init:/vault/init
     networks:
       - internal-net
     healthcheck:
@@ -60,8 +75,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- Vault init: enable transit engine + tạo key "dek" ---
-  # Chạy 1 lần, tự exit sau khi xong
+  # Chạy 1 lần duy nhất khi khởi động — init transit engine và tạo key
   vault-init:
     image: hashicorp/vault:1.15
     container_name: vault-init
@@ -71,20 +85,50 @@ services:
         condition: service_healthy
     environment:
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: root
+      VAULT_TOKEN: ${VAULT_TOKEN}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         vault secrets enable transit || true
-        vault write -f transit/keys/dek
-        echo "✅ Vault transit + key 'dek' ready"
+        vault write -f transit/keys/${VAULT_KEY_NAME}
+        echo "✅ Vault transit + key '${VAULT_KEY_NAME}' ready"
     networks:
       - internal-net
+
+
+# TẦNG 2 — XÁC THỰC (Auth / Identity)
+# keycloak
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    restart: unless-stopped
+    command: start-dev --features=dpop --import-realm
+    ports:
+      - "8082:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    volumes:
+      - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    networks:
+      - edge-net
+      - internal-net
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/1/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s      # keycloak khởi động chậm, cần chờ đủ
+
+
+# TẦNG 3 — PHÂN QUYỀN (Policy)
+# opa
 
   opa:
     image: openpolicyagent/opa:0.65.0
     container_name: opa
-    restart: always
+    restart: unless-stopped
     command:
       - "run"
       - "--server"
@@ -97,6 +141,7 @@ services:
     volumes:
       - ./opa/config:/config
       - ./opa/policies:/policies
+      - ./opa/tests:/tests
     networks:
       - internal-net
     healthcheck:
@@ -106,68 +151,14 @@ services:
       retries: 5
       start_period: 15s
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    container_name: keycloak
-    restart: always
-    command: start-dev --import-realm
-    ports:
-      - "8081:8080"
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    volumes:
-      - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
-    networks:
-      - edge-net
-      - internal-net
-    healthcheck:
-      test: ["CMD-SHELL", "cat /proc/1/status || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 120s
 
-  backend:
-    build:
-      context: ./backend
-    container_name: api-backend
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      opa:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    ports:
-      - "9000:9000"
-    volumes:
-      - ./backend/app:/app/app
-    env_file:
-      - .env  
-    environment:
-      OPA_URL: http://opa:8181
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: root
-      VAULT_KEY_NAME: dek
-      REDIS_URL: redis://redis:6379
-      DEK_BASE64: "MvJdAMNVYy1j4Ewb5fZ3h4pCxAfrYd+YC0QRrHATgH8="
-    networks:
-      - internal-net
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
+# TẦNG 4 — API GATEWAY
+# kong — nhận traffic từ edge, verify JWT, rate limit, forward vào backend
 
   kong:
     image: kong:3.6
     container_name: api-gateway
-    restart: always
+    restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
@@ -180,16 +171,19 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_PLUGINS: bundled
+      KONG_PLUGINS: bundled,opa-authz,jwt-hardening,hsts-header
       KONG_SSL_CERT: /certs/kong.crt
       KONG_SSL_CERT_KEY: /certs/kong.key
       KONG_SSL_PROTOCOLS: "TLSv1.3"
     ports:
-      - "8000:8000"
-      - "8443:8443"
-      - "8001:8001"
+      - "8000:8000"   # HTTP proxy
+      - "8443:8443"   # HTTPS proxy
+      - "8001:8001"   # Admin API (dev only — đừng expose production)
     volumes:
       - ./gateway/kong.yml:/usr/local/kong/declarative/kong.yml
+      - ./gateway/plugins/opa-authz:/usr/local/share/lua/5.1/kong/plugins/opa-authz
+      - ./gateway/plugins/jwt-hardening:/usr/local/share/lua/5.1/kong/plugins/jwt-hardening
+      - ./gateway/plugins/hsts-header:/usr/local/share/lua/5.1/kong/plugins/hsts-header
       - ./gateway/plugins:/usr/local/kong/plugins
       - ./certs:/certs:ro
     networks:
@@ -201,30 +195,66 @@ services:
       timeout: 5s
       retries: 5
 
+
+# TẦNG 5 — ỨNG DỤNG (Application)
+# backend, frontend
+
+  backend:
+    build:
+      context: ./backend
+    container_name: api-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    ports:
+      - "9000:9000"   # expose để dev test trực tiếp, bỏ khi production
+    volumes:
+      - ./backend/app:/app/app   # hot reload khi dev
+    env_file: .env
+    environment:
+      PYTHONPATH: /app/app  
+      OPA_URL: http://opa:8181
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      VAULT_KEY_NAME: ${VAULT_KEY_NAME}
+      REDIS_URL: redis://redis:6379
+      DEK_BASE64: ${DEK_BASE64}
+    networks:
+      - internal-net
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
   frontend:
     build:
       context: ./frontend
-      # VITE_* phải truyền qua build args, không phải environment
       args:
-        VITE_KEYCLOAK_URL: "http://localhost:8081"
-        VITE_KONG_URL: "http://localhost:8000"
-        VITE_REALM: "cloudapi"
-        VITE_CLIENT_ID: "spa-client"
+        # Build-time args — Vite nhúng vào bundle lúc build
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
+        VITE_KONG_URL: ${VITE_KONG_URL}
+        VITE_REALM: ${VITE_REALM}
+        VITE_CLIENT_ID: ${VITE_CLIENT_ID}
     container_name: api-frontend
-    restart: always
+    restart: unless-stopped
     depends_on:
       kong:
         condition: service_healthy
     ports:
       - "5173:80"
-      - "5174:443" 
+      - "5174:443"
     volumes:
-      - ./certs:/certs:ro 
-    environment:
-      - VITE_KEYCLOAK_URL=http://localhost:8081
-      - VITE_KONG_URL=http://localhost:8000
-      - VITE_REALM=cloudapi
-      - VITE_CLIENT_ID=spa-client
+      - ./certs:/certs:ro
     networks:
       - edge-net
     healthcheck:
@@ -234,14 +264,22 @@ services:
       retries: 5
       start_period: 10s
 
+
+# TẦNG 6 — QUAN SÁT (Observability)   [profile: obs]
+# Chạy thêm:  docker compose --profile obs up -d
+# loki, promtail, grafana
+
   loki:
     image: grafana/loki:2.9.0
     container_name: loki
-    restart: always
+    restart: unless-stopped
+    profiles: [obs]
     ports:
       - "3100:3100"
     volumes:
+      - loki_data:/loki
       - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - ./observability/loki/rules:/etc/loki/rules
     command: -config.file=/etc/loki/loki-config.yml
     networks:
       - obs-net
@@ -254,7 +292,8 @@ services:
   promtail:
     image: grafana/promtail:2.9.0
     container_name: promtail
-    restart: always
+    restart: unless-stopped
+    profiles: [obs]
     depends_on:
       loki:
         condition: service_healthy
@@ -271,15 +310,16 @@ services:
   grafana:
     image: grafana/grafana:10.0.0
     container_name: grafana
-    restart: always
+    restart: unless-stopped
+    profiles: [obs]
     depends_on:
       loki:
         condition: service_healthy
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - grafana_data:/var/lib/grafana
@@ -293,16 +333,25 @@ services:
       timeout: 5s
       retries: 5
 
+# TẦNG 7 — CÔNG CỤ DEV (Dev Tools)   [profile: tools]
+# Chạy thêm:  docker compose --profile tools up -d
+# pgadmin
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin
-    restart: always
+    restart: unless-stopped
+    profiles: [tools]
     ports:
       - "5050:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     networks:
       - internal-net
-
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/misc/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
