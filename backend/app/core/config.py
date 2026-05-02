@@ -13,9 +13,6 @@ class Settings(BaseSettings):
     jwt_issuer: str
     jwt_audience: str
 
-    # AEAD encryption
-    dek_base64: str
-
     class Config:
         env_file = ".env"
         case_sensitive = False  # đọc được cả KEYCLOAK_URL lẫn keycloak_url

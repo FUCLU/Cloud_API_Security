@@ -1,5 +1,5 @@
 ~ ALG NONE ATTACK EVIDENCE ~
-timestamp_utc: 2026-05-02T01:22:50.473413+00:00
+timestamp_utc: 2026-05-02T07:31:30.312599+00:00
 target_url: https://localhost:8443/api/v1/users
 header_json: {"alg":"none","typ":"JWT"}
 payload_json: {"sub":"attacker","role":"admin","email":"attacker@evil.local","exp":9999999999}

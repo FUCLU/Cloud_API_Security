@@ -86,12 +86,13 @@ services:
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN}
+    volumes:
+      - ./vault/init:/vault/init
+      - ./vault/policies:/vault/policies
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        vault secrets enable transit || true
-        vault write -f transit/keys/${VAULT_KEY_NAME}
-        echo "✅ Vault transit + key '${VAULT_KEY_NAME}' ready"
+        sh /vault/init/vault-init.sh
     networks:
       - internal-net
 
@@ -224,8 +225,8 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_KEY_NAME: ${VAULT_KEY_NAME}
+      VAULT_WRAPPED_DEK: ${VAULT_WRAPPED_DEK}
       REDIS_URL: redis://redis:6379
-      DEK_BASE64: ${DEK_BASE64}
     networks:
       - internal-net
     healthcheck:

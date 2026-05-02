@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models import User as UserModel
-from app.security.aead_encryption import decrypt_field, load_dek_from_env
+from app.security.aead_encryption import decrypt_field, get_dek
 
 router = APIRouter()
 
@@ -18,8 +18,7 @@ DATABASE_URL = os.getenv(
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
-dek = load_dek_from_env()
-
+dek = get_dek()
 
 class User(BaseModel):
     id: int

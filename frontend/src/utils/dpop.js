@@ -57,13 +57,8 @@ function encodeJsonPart(obj) {
 }
 
 export async function createDpopProof({ htu, htm, accessToken }) {
-  if (!accessToken) {
-    throw new Error('Missing access token for DPoP proof')
-  }
-
   const { privateKey, publicJwk } = await getOrCreateDpopKeyPair()
   const iat = Math.floor(Date.now() / 1000)
-  const ath = await sha256Base64Url(accessToken)
 
   const header = {
     typ: 'dpop+jwt',
@@ -76,8 +71,8 @@ export async function createDpopProof({ htu, htm, accessToken }) {
     htm: htm.toUpperCase(),
     htu,
     iat,
-    ath,
   }
+  if (accessToken) payload.ath = await sha256Base64Url(accessToken)
 
   const encodedHeader = encodeJsonPart(header)
   const encodedPayload = encodeJsonPart(payload)

@@ -8,4 +8,5 @@ export VAULT_ADDR VAULT_TOKEN
 
 vault secrets enable transit >/dev/null 2>&1 || true
 vault write -f transit/keys/dek >/dev/null
-echo "Vault init done: transit/dek created."
+vault policy write dek-policy /vault/policies/dek-policy.hcl >/dev/null
+echo "Vault init done: transit/dek created + dek-policy applied."

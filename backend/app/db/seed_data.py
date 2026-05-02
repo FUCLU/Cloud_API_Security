@@ -5,7 +5,7 @@ import os
 
 # Import path đúng khi chạy trong container (WORKDIR = /app)
 from app.db.models import Base, User, Product, Order
-from app.security.aead_encryption import encrypt_field, decrypt_field, load_dek_from_env
+from app.security.aead_encryption import encrypt_field, decrypt_field, get_dek
 
 fake = Faker()
 
@@ -19,7 +19,7 @@ session = Session()
 Base.metadata.create_all(engine)
 
 # ─── Load DEK ────────────────────────────────────────────────────────────────
-dek = load_dek_from_env()
+dek = get_dek()
 print(f"[SEED] DEK loaded ({len(dek)} bytes)")
 
 # ─── Seed Users ───────────────────────────────────────────────────────────────

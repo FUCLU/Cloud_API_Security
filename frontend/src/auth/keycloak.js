@@ -1,3 +1,4 @@
+import { createDpopProof } from '../utils/dpop'
 const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL
 const REALM = import.meta.env.VITE_REALM
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
@@ -62,9 +63,18 @@ export async function loginWithPassword(email, password, totp = '') {
   })
   if (totp) body.set('totp', totp)
 
-  const res = await fetch(`${BASE}/token`, {
+  const tokenEndpoint = `${BASE}/token`
+  const dpopProof = await createDpopProof({
+    htu: tokenEndpoint,
+    htm: 'POST',
+  })
+
+  const res = await fetch(tokenEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      DPoP: dpopProof,
+    },
     body,
   })
 
@@ -88,9 +98,18 @@ export async function handleCallback() {
   const verifier = sessionStorage.getItem('pkce_verifier')
   if (!verifier) throw new Error('Missing PKCE verifier')
 
-  const res = await fetch(`${BASE}/token`, {
+  const tokenEndpoint = `${BASE}/token`
+  const dpopProof = await createDpopProof({
+    htu: tokenEndpoint,
+    htm: 'POST',
+  })
+
+  const res = await fetch(tokenEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      DPoP: dpopProof,
+    },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: CLIENT_ID,
@@ -111,9 +130,18 @@ export async function handleCallback() {
 }
 
 export async function refreshTokens(refreshToken) {
-  const res = await fetch(`${BASE}/token`, {
+  const tokenEndpoint = `${BASE}/token`
+  const dpopProof = await createDpopProof({
+    htu: tokenEndpoint,
+    htm: 'POST',
+  })
+
+  const res = await fetch(tokenEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      DPoP: dpopProof,
+    },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: CLIENT_ID,
