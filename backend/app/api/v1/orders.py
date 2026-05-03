@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import Order
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional
 import hmac
 from hashlib import sha256
 import os
@@ -11,8 +11,17 @@ import os
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
+# --- SCHEMAS ---
+class OrderCreate(BaseModel):
+    status: str = Field(
+        default="pending", pattern="^(pending|shipped|completed|cancelled)$"
+    )
+    total: float = Field(..., gt=0, description="Tổng tiền phải lớn hơn 0")
+
+
 class OrderResponse(BaseModel):
     id: int
+    user_id: Optional[int] = None  # Thêm trường này để Swagger UI hiển thị đầy đủ
     status: str
     total: float
 
@@ -21,11 +30,13 @@ class OrderResponse(BaseModel):
         orm_mode = True
 
 
-class OrderCreate(BaseModel):
-    status: str = "pending"
-    total: float
+class WebhookPayload(BaseModel):
+    # Schema này chỉ để OpenAPI vẽ tài liệu (Swagger), validation thực tế vẫn xử lý ở hàm
+    order_id: int
+    status: str
 
 
+# --- ENDPOINTS ---
 @router.get("", response_model=List[OrderResponse])
 def get_orders(db: Session = Depends(get_db)):
     return db.query(Order).all()
@@ -71,7 +82,8 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/webhooks/orders")
-async def order_webhook(request: Request):
+async def order_webhook(request: Request, payload: WebhookPayload):
+    # Gắn 'payload: WebhookPayload' để sinh OpenAPI docs, nhưng vẫn đọc 'request.body()' để verify HMAC byte-by-byte
     body = await request.body()
     timestamp = request.headers.get("X-Timestamp")
     sig_header = request.headers.get("X-Signature")
@@ -87,7 +99,6 @@ async def order_webhook(request: Request):
         secret.encode(), f"{timestamp}.".encode() + body, sha256
     ).hexdigest()
 
-    # So sánh an toàn chống Timing Attack
     if not hmac.compare_digest(expected_sig, sig_header):
         raise HTTPException(status_code=401, detail="Invalid signature")
 

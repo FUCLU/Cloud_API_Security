@@ -2,8 +2,9 @@
     "total_requests": 100,
     "valid_attempts_simulated": 90,
     "invalid_attempts_simulated": 10,
-    "successful_logins": 3,
-    "failed_logins": 97,
+    "successful_logins": 0,
+    "failed_logins": 100,
     "false_accept_vulnerabilities": 0,
-    "valid_login_success_rate": "3.3%"
+    "rate_limited_or_temporarily_disabled": false,
+    "valid_login_success_rate": "0.0%"
 }

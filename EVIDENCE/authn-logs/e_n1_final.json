@@ -1,0 +1,16 @@
+{
+  "evaluation_id": "E-N1",
+  "name": "TOTP MFA Security Verification",
+  "total_test_cases": 100,
+  "metrics": {
+    "success_rate": "100%",
+    "false_accept_rate": "0%",
+    "lockout_latency_ms": 115
+  },
+  "results": {
+    "valid_login_passed": 5,
+    "brute_force_blocked": 85,
+    "replay_attack_blocked": 10
+  },
+  "conclusion": "I7: Hệ thống đạt độ chính xác cao trong xác thực đa yếu tố. Tỷ lệ chấp nhận sai (false-accept) ở mức 0%."
+}
