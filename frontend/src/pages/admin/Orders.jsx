@@ -35,15 +35,8 @@ export default function AdminOrders() {
       <div className="topbar">
         <div>
           <div className="topbar-title">Quản lý đơn hàng</div>
-          <div className="topbar-sub">Admin — xem tất cả đơn · BOLA monitoring active</div>
         </div>
         <div className="topbar-right">
-          {ORDERS.filter(o => o.secFlag).length > 0 && (
-            <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'var(--accent)', background:'#fcecea', padding:'5px 10px', borderRadius:'6px', border:'1px solid #f5c8c2' }}>
-              <span>⚠️</span>
-              {ORDERS.filter(o => o.secFlag).length} security flag
-            </div>
-          )}
           <button className="btn btn-outline btn-sm">📤 Xuất Excel</button>
           <button className="btn btn-primary btn-sm">+ Tạo đơn</button>
         </div>
@@ -51,7 +44,7 @@ export default function AdminOrders() {
 
       <div className="content">
         <div className="status-tabs">
-          {[['all','Tất cả',8],['new','Mới',1],['pending','Đang xử lý',2],['shipping','Đang giao',2],['success','Hoàn thành',2],['failed','Thất bại',1]].map(([k,l,c]) => (
+          {[['all','Tổng',8],['new','Mới',1],['pending','Đang xử lý',2],['shipping','Đang giao',2],['success','Hoàn thành',2],['failed','Thất bại',1]].map(([k,l,c]) => (
             <div key={k} className={'stab'+(filter===k?' active':'')} onClick={() => setFilter(k)}>
               {l} <span className="cnt">{c}</span>
             </div>
@@ -63,7 +56,6 @@ export default function AdminOrders() {
             <span>🔍</span>
             <input placeholder="Tìm mã đơn, tên khách..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select><option>7 ngày qua</option><option>30 ngày qua</option><option>Tháng này</option></select>
         </div>
 
         <div className="card">

@@ -44,7 +44,9 @@ export function AuthProvider({ children }) {
       })
     )
 
-    const payload = parseToken(tokens.access_token)
+    const accessPayload = parseToken(tokens.access_token)
+    const idPayload = parseToken(tokens.id_token)
+    const payload = { ...accessPayload, ...idPayload }
     const roles = getRoles(tokens.access_token)
 
     setUser({
@@ -57,7 +59,7 @@ export function AuthProvider({ children }) {
 
     if (timerRef.current) clearTimeout(timerRef.current)
     const now = Math.floor(Date.now() / 1000)
-    const expiresIn = (payload?.exp ?? now) - now
+    const expiresIn = (accessPayload?.exp ?? now) - now
     const delay = Math.max((expiresIn - 30) * 1000, 0)
 
     timerRef.current = setTimeout(async () => {

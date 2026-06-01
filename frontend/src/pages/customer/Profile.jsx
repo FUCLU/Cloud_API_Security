@@ -1,7 +1,12 @@
 import React, { useState } from 'react'
+import { getDisplayEmail, getDisplayName, getInitials, getPrimaryRole } from '../../auth/userDisplay'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function Profile() {
   const [saved, setSaved] = useState(false)
+  const { user } = useAuth()
+  const displayName = getDisplayName(user)
+  const displayEmail = getDisplayEmail(user)
 
   return (
     <div className="page-content">
@@ -9,10 +14,10 @@ export default function Profile() {
       <div className="profile-grid">
         <div className="profile-sidebar">
           <div className="profile-avatar-card">
-            <div className="big-avatar">NA</div>
-            <div className="profile-name">Nguyễn Văn An</div>
-            <div className="profile-email">an.nv@gmail.com</div>
-            <span className="badge badge-gray profile-role">Customer</span>
+            <div className="big-avatar">{getInitials(user)}</div>
+            <div className="profile-name">{displayName}</div>
+            <div className="profile-email">{displayEmail}</div>
+            <span className="badge badge-gray profile-role">{getPrimaryRole(user)}</span>
             <div style={{ marginTop:'14px', fontSize:'11.5px', color:'var(--muted)' }}>Tham gia 15/01/2026</div>
           </div>
           <div className="card card-body" style={{ padding:'16px' }}>
@@ -45,8 +50,8 @@ export default function Profile() {
             <div className="card-header"><div className="card-title">Thông tin cá nhân</div></div>
             <div className="card-body">
               <div className="field-row">
-                <div className="field"><label>Họ tên</label><input defaultValue="Nguyễn Văn An" /></div>
-                <div className="field"><label>Email</label><input defaultValue="an.nv@gmail.com" readOnly style={{ background:'var(--cream)', color:'var(--muted)' }} /></div>
+                <div className="field"><label>Họ tên</label><input value={displayName} readOnly /></div>
+                <div className="field"><label>Email</label><input value={displayEmail} readOnly style={{ background:'var(--cream)', color:'var(--muted)' }} /></div>
               </div>
               <div className="field-row">
                 <div className="field"><label>Số điện thoại</label><input defaultValue="0901 234 567" /></div>
@@ -66,9 +71,6 @@ export default function Profile() {
               <div className="field-row">
                 <div className="field"><label>Mật khẩu mới</label><input type="password" placeholder="••••••••" /></div>
                 <div className="field"><label>Xác nhận</label><input type="password" placeholder="••••••••" /></div>
-              </div>
-              <div style={{ padding:'10px 13px', background:'#f0faf4', border:'1px solid #c8e6d4', borderRadius:'8px', fontSize:'11.5px', color:'var(--green)', marginBottom:'14px' }}>
-                🔒 Mật khẩu được hash bằng bcrypt cost=12 trước khi lưu vào Keycloak
               </div>
               <button className="btn btn-primary">🔑 Đổi mật khẩu</button>
             </div>

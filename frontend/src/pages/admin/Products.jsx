@@ -21,16 +21,12 @@ const SC = { ok:'badge-green', low:'badge-amber', out:'badge-red' }
 export default function AdminProducts() {
   const [products, setProducts] = useState(PRODS)
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState('')
-  const [stock, setStock] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState({ n:'', d:'', c:'Điện tử', p:'', s:'ok', e:'📦' })
 
   const filtered = products.filter(p =>
-    (!search || p.n.toLowerCase().includes(search.toLowerCase())) &&
-    (!cat   || p.c === cat) &&
-    (!stock || p.s === stock)
+    (!search || p.n.toLowerCase().includes(search.toLowerCase()))
   )
 
   function openAdd() {
@@ -78,14 +74,6 @@ export default function AdminProducts() {
             <span>🔍</span>
             <input placeholder="Tìm tên sản phẩm..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select value={cat} onChange={e => setCat(e.target.value)}>
-            <option value="">Tất cả danh mục</option>
-            <option>Điện tử</option><option>Thực phẩm</option><option>Thời trang</option><option>Văn phòng</option>
-          </select>
-          <select value={stock} onChange={e => setStock(e.target.value)}>
-            <option value="">Tất cả tồn kho</option>
-            <option value="ok">Còn hàng</option><option value="low">Sắp hết</option><option value="out">Hết hàng</option>
-          </select>
           <span className="filter-count">{filtered.length} sản phẩm</span>
         </div>
 

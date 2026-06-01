@@ -106,7 +106,7 @@ Sơ đồ đầy đủ: [`ARCH/ARCH.pdf`](ARCH/ARCH.pdf).
  
 > ⚠️ **Lưu ý:** FastAPI expose ở `:9000` chỉ để debug nội bộ. Mọi request từ client **phải** đi qua **Kong `:8000`** để được JWT verify, rate-limit và OPA authz kiểm tra.
  
-> ⚠️ **Keycloak realm:** Realm hiện tại tên là **`cloudapi`** (không phải `lab`). Mọi API call liên quan đến Keycloak dùng `/realms/cloudapi/`.
+> ⚠️ **Keycloak realm:** Realm hiện tại tên là **`cloudapi`** (không dùng realm cũ). Mọi API call liên quan đến Keycloak dùng `/realms/cloudapi/`.
 
 ---
 
@@ -662,10 +662,10 @@ GitHub Actions tự động chạy khi push lên `main` và `dev`:
  
 - **Không commit** file `.env`, `*.key`, `*.pem`, `*.p12` vào repo — đã có trong `.gitignore`
 - Dùng **synthetic data** cho tất cả test, không dùng dữ liệu thật
-- Chỉ pentest trên **lab infrastructure** — không scan third-party services
+- Chỉ pentest trên **hạ tầng kiểm thử** — không scan third-party services
 - Sanitize logs trước khi đưa vào `EVIDENCE/`
 - File `.env.example` là template — copy sang `.env` và điền secret thực trước khi chạy
-- Keycloak realm: **`cloudapi`** — không phải `lab`
+- Keycloak realm: **`cloudapi`** — không dùng realm cũ
 - Kong custom plugins (`jwt-hardening`, `hsts-header`, `opa-authz`) chưa implement — `KONG_PLUGINS: bundled`
 - Vault UI token mặc định: `root` (dev mode only)
  

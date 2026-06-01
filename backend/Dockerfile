@@ -11,5 +11,5 @@ COPY . .
 
 EXPOSE 9000
 
-# Chạy FastAPI
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+# Chạy qua app.main để dùng SSLContext TLS 1.3 khi /certs/backend.crt tồn tại
+CMD ["python", "-m", "app.main"]

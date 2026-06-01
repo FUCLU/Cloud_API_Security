@@ -42,18 +42,12 @@ export default function StaffOrders() {
       <div className="topbar">
         <div>
           <div className="topbar-title">Xử lý đơn hàng</div>
-          <div className="topbar-sub">Staff — cập nhật trạng thái đơn hàng</div>
-        </div>
-        <div className="topbar-right">
-          <div style={{ padding:'7px 14px', background:'#fff4e8', border:'1px solid #f5c8a0', borderRadius:'8px', fontSize:'12px', color:'var(--amber)' }}>
-            ⚠️ Staff không thể xoá đơn
-          </div>
         </div>
       </div>
 
       <div className="content">
         <div className="status-tabs">
-          {[['all','Tất cả'],['new','Mới'],['pending','Đang xử lý'],['shipping','Đang giao'],['success','Hoàn thành'],['failed','Thất bại']].map(([k,l]) => (
+          {[['all','Tổng'],['new','Mới'],['pending','Đang xử lý'],['shipping','Đang giao'],['success','Hoàn thành'],['failed','Thất bại']].map(([k,l]) => (
             <div key={k} className={'stab'+(filter===k?' active':'')} onClick={() => setFilter(k)}>
               {l} <span className="cnt">{counts[k] || 0}</span>
             </div>
@@ -84,10 +78,6 @@ export default function StaffOrders() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div style={{ marginTop:'14px', padding:'14px 18px', background:'#e8f5ee', border:'1px solid #c8e6d4', borderRadius:'10px', fontSize:'13px', color:'var(--green)' }}>
-          ✅ Mỗi thay đổi trạng thái đều được <strong>ghi audit log</strong> tự động bởi OPA.
         </div>
       </div>
 

@@ -87,12 +87,12 @@
       "firstBrokerLoginFlowAlias": "first broker login",
       "authenticateByDefault": false,
       "linkOnly": false,
-      "updateProfileFirstLoginMode": "on",
+      "updateProfileFirstLoginMode": "off",
       "trustEmail": true,
       "storeToken": false,
       "config": {
         "clientId": "679393827886-fnimrsjluoue2n568kn0nfqt5jpmt7ip.apps.googleusercontent.com",
-        "clientSecret": "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",
+        "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
         "useJwksUrl": "true",
         "defaultScope": "openid profile email"
       }

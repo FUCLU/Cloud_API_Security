@@ -270,7 +270,7 @@ export default function AdminDashboard() {
               <div className="card">
                 <div className="card-header">
                   <div className="card-title">Attack vectors phát hiện</div>
-                  <a className="card-link" onClick={() => navigate('/admin/attacks')}>Lab →</a>
+                  <a className="card-link" onClick={() => navigate('/admin/attacks')}>Test →</a>
                 </div>
                 <div className="card-body" style={{padding:'12px 16px'}}>
                   {[
@@ -288,7 +288,7 @@ export default function AdminDashboard() {
                   ))}
                   <div style={{marginTop:'14px'}}>
                     <button className="btn btn-primary btn-sm" style={{width:'100%'}} onClick={() => navigate('/admin/attacks')}>
-                      ⚡ Mở Attack Simulation Lab →
+                      ⚡ Mở Attack Simulation →
                     </button>
                   </div>
                 </div>

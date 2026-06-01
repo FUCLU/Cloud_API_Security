@@ -186,8 +186,8 @@ export default function AttackSimulation() {
     <>
       <div className="topbar">
         <div>
-          <div className="topbar-title">Attack Simulation Lab</div>
-          <div className="topbar-sub">Mô phỏng tấn công API — OWASP Top 10 · chỉ chạy trên môi trường lab</div>
+          <div className="topbar-title">Attack Simulation</div>
+          <div className="topbar-sub">Mô phỏng tấn công API — OWASP Top 10 · chỉ chạy trên môi trường kiểm thử</div>
         </div>
         <div className="topbar-right">
           {totalRun > 0 && (
@@ -208,13 +208,6 @@ export default function AttackSimulation() {
       </div>
 
       <div className="content">
-        <div style={{background:'#fff8e8',border:'1.5px solid #f5d98a',borderRadius:'10px',padding:'12px 16px',marginBottom:'22px',display:'flex',alignItems:'center',gap:'10px'}}>
-          <span style={{fontSize:'16px'}}>⚠️</span>
-          <span style={{fontSize:'13px',color:'var(--amber)'}}>
-            <strong>Lab environment only.</strong> Gọi <code style={{fontFamily:'monospace',background:'rgba(0,0,0,.06)',padding:'0 3px',borderRadius:'3px'}}>POST {KONG_URL}/api/v1/attacks/simulate</code> — fallback mock nếu backend chưa sẵn sàng.
-          </span>
-        </div>
-
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',marginBottom:'24px'}}>
           {attacks.map(attack => {
             const res = results[attack.id]

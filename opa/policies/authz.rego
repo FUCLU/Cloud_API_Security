@@ -16,6 +16,14 @@ allowed_role {
 }
 
 allow {
+  input.path == "/health"
+}
+
+allow {
+  input.path == "/"
+}
+
+allow {
   input.role == "admin"
 }
 
@@ -56,6 +64,12 @@ allow {
 }
 
 allow {
+  input.role == "customer"
+  input.method == "GET"
+  startswith(input.path, "/api/v1/orders")
+}
+
+allow {
   startswith(input.path, "/webhooks/")
   input.hmac_verified == true
 }
@@ -65,16 +79,19 @@ reason = "access_granted" {
 }
 
 reason = "invalid_hmac" {
+  not allow
   startswith(input.path, "/webhooks/")
   not input.hmac_verified
 }
 
 reason = "missing_role" {
+  not allow
   not input.role
   not startswith(input.path, "/webhooks/")
 }
 
 reason = "forbidden_role" {
+  not allow
   input.role
   not allowed_role
 }

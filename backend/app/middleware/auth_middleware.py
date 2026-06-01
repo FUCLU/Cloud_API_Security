@@ -9,6 +9,7 @@ from app.security.dpop_verifier import verify_dpop
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         public_paths = [
+            '/',
             '/health',
             '/docs',
             '/openapi.json',

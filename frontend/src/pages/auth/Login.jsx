@@ -27,7 +27,7 @@ export default function Login() {
     try {
       await login({ loginHint: email || '', prompt: 'login' })
     } catch (err) {
-      setError(err?.message ?? 'Khong the chuyen huong dang nhap Keycloak')
+      setError(err?.message ?? 'Không thể chuyển hướng đăng nhập Keycloak')
       setLoading(false)
     }
   }
@@ -44,7 +44,7 @@ export default function Login() {
     try {
       await loginWithGoogle()
     } catch (err) {
-      setError(err?.message ?? 'Khong the dang nhap Google')
+      setError(err?.message ?? 'Không thể đăng nhập Google')
       setLoading(false)
     }
   }

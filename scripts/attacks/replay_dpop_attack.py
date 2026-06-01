@@ -253,8 +253,8 @@ def main() -> None:
     if first.status_code == 403 and second.status_code == 403:
         verdict = "INVALID_TEST_POLICY_BLOCK"
         verdict_detail = (
-            "Request bi chan boi policy/role truoc khi den replay check. "
-            "Can doi user hoac endpoint duoc allow de test replay dung."
+            "Request bị chặn bởi policy/role trước khi đến replay check. "
+            "Cần đổi user hoặc endpoint được allow để test replay đúng."
         )
     elif (
         first.status_code == 401
@@ -263,18 +263,18 @@ def main() -> None:
     ):
         verdict = "INVALID_TEST_TOKEN_NOT_BOUND"
         verdict_detail = (
-            "Access token chua duoc bind DPoP (thieu cnf.jkt), "
-            "nen khong the ket luan replay tren token-bound flow."
+            "Access token chưa được bind DPoP (thiếu cnf.jkt), "
+            "nên không thể kết luận replay trên token-bound flow."
         )
     elif first.status_code == 200 and second.status_code in [401, 400]:
         verdict = "PASS"
-        verdict_detail = "Replay bi chan dung (jti da duoc su dung)."
+        verdict_detail = "Replay bị chặn đúng (jti đã được sử dụng)."
     elif first.status_code == 200 and second.status_code == 200:
         verdict = "FAIL_REPLAY_ACCEPTED"
-        verdict_detail = "Replay khong bi chan."
+        verdict_detail = "Replay không bị chặn."
     else:
         verdict = "FAIL_UNEXPECTED"
-        verdict_detail = "Ket qua khong dung mau mong doi, can kiem tra middleware/log."
+        verdict_detail = "Kết quả không đúng mẫu mong đợi, cần kiểm tra middleware/log."
 
     print(f"=> Kết luận: {verdict}")
     print(f"=> Chi tiết: {verdict_detail}")

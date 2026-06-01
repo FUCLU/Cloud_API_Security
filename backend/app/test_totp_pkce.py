@@ -55,12 +55,12 @@ def test_totp():
     print(
         """
   ─── Verify thủ công với Keycloak ───
-  1. Login http://localhost:8081/admin → realm 'lab' → Users → phuc
+  1. Login http://localhost:8081/admin → realm 'cloudapi' → Users → phuc
   2. Tab 'Credentials' → xem TOTP secret (hoặc scan QR khi login lần đầu)
   3. Dùng secret thật đó thay vào biến 'secret' ở trên
   4. Gọi login với sai TOTP → Keycloak trả 401:
 
-  curl -s -X POST http://localhost:8081/realms/lab/protocol/openid-connect/token \\
+  curl -s -X POST http://localhost:8081/realms/cloudapi/protocol/openid-connect/token \\
     -d "client_id=spa-client&grant_type=password" \\
     -d "username=phuc&password=demo1234&totp=000000"
   # → {"error":"invalid_grant","error_description":"Invalid user credentials"}
@@ -114,7 +114,7 @@ def test_pkce_params():
 
     # Build authorization URL (task 2.2)
     KEYCLOAK_URL = "http://localhost:8081"
-    REALM = "lab"
+    REALM = "cloudapi"
     CLIENT_ID = "spa-client"
     REDIRECT_URI = "http://localhost:5173/callback"
     STATE = secrets.token_urlsafe(16)
@@ -142,7 +142,7 @@ def test_pkce_params():
   ─── Đổi code lấy token (task 2.4) ───
   Sau khi có <auth_code> từ bước trên, chạy:
 
-  curl -s -X POST http://localhost:8081/realms/lab/protocol/openid-connect/token \\
+  curl -s -X POST http://localhost:8081/realms/cloudapi/protocol/openid-connect/token \\
     -H "Content-Type: application/x-www-form-urlencoded" \\
     -d "grant_type=authorization_code" \\
     -d "client_id=spa-client" \\

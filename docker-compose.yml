@@ -14,6 +14,7 @@ volumes:
   postgres_data:
   grafana_data:
   loki_data:
+  prometheus_data:
 
 
 # TẦNG 1 — HẠ TẦNG (Infrastructure)
@@ -218,6 +219,7 @@ services:
       - "9000:9000"   # expose để dev test trực tiếp, bỏ khi production
     volumes:
       - ./backend/app:/app/app   # hot reload khi dev
+      - ./certs:/certs:ro
     env_file: .env
     environment:
       PYTHONPATH: /app/app  
@@ -231,7 +233,7 @@ services:
       - internal-net
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+             "import ssl, urllib.request; urllib.request.urlopen('https://localhost:9000/health', context=ssl._create_unverified_context())"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -268,7 +270,7 @@ services:
 
 # TẦNG 6 — QUAN SÁT (Observability)   [profile: obs]
 # Chạy thêm:  docker compose --profile obs up -d
-# loki, promtail, grafana
+# loki, promtail, grafana, prometheus, cadvisor
 
   loki:
     image: grafana/loki:2.9.0
@@ -316,6 +318,8 @@ services:
     depends_on:
       loki:
         condition: service_healthy
+      prometheus:
+        condition: service_started
     ports:
       - "3000:3000"
     environment:
@@ -333,6 +337,49 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: api-cadvisor
+    restart: unless-stopped
+    profiles: [obs]
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+    networks:
+      - obs-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: api-prometheus
+    restart: unless-stopped
+    profiles: [obs]
+    ports:
+      - "9091:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    depends_on:
+      cadvisor:
+        condition: service_started
+    networks:
+      - obs-net
 
 # TẦNG 7 — CÔNG CỤ DEV (Dev Tools)   [profile: tools]
 # Chạy thêm:  docker compose --profile tools up -d

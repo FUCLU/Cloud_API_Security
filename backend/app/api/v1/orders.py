@@ -8,6 +8,8 @@ import hmac
 from hashlib import sha256
 import os
 
+from app.security.bola_guard import can_read_order
+
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
@@ -37,14 +39,14 @@ def get_order(order_id: int, request: Request, db: Session = Depends(get_db)):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if not hasattr(request.state, "token") or not request.state.token:
+    token_payload = getattr(request.state, "user", None)
+    if not token_payload:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    token_sub = request.state.token.get("sub")
-
-    # BOLA LOGIC: Chặn User A xem Order của User B
+    # BOLA LOGIC: customer chỉ được xem order thuộc subject của chính mình.
+    # Admin/staff được phép xem để vận hành đơn hàng.
     order_owner_id = getattr(order, "user_id", None)
-    if order_owner_id is not None and str(order_owner_id) != str(token_sub):
+    if not can_read_order(order_owner_id, token_payload):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return order

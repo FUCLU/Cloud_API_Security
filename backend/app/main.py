@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Chọn 1 bộ router duy nhất — api/v1 vì đã có prefix /api/v1 bên trong
-from app.api.v1 import users, orders, products, auth
+from app.api.v1 import users, orders, products, auth, security
 from app.middleware.auth_middleware import AuthMiddleware
 from app.db.database import init_db
 
@@ -38,6 +38,7 @@ app.include_router(users.router)
 app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(auth.router)
+app.include_router(security.router)
 
 
 @app.on_event("startup")
@@ -58,11 +59,13 @@ if __name__ == "__main__":
     CERT = "/certs/backend.crt"
     KEY  = "/certs/backend.key"
 
-    ssl_ctx = None
+    uvicorn_kwargs = {}
     if os.path.exists(CERT) and os.path.exists(KEY):
-        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_3
-        ssl_ctx.load_cert_chain(certfile=CERT, keyfile=KEY)
+        uvicorn_kwargs = {
+            "ssl_certfile": CERT,
+            "ssl_keyfile": KEY,
+            "ssl_version": ssl.PROTOCOL_TLS_SERVER,
+        }
         print("✅ TLS 1.3 enabled")
     else:
         print("⚠️ Running HTTP (debug mode)")
@@ -71,5 +74,5 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=9000,
-        ssl_context=ssl_ctx,
+        **uvicorn_kwargs,
     )

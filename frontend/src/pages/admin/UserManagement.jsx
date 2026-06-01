@@ -74,7 +74,6 @@ function TokenInspector({ token }) {
 export default function UserManagement() {
   const [users, setUsers] = useState(INIT_USERS)
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [showNotif, setShowNotif] = useState(false)
   const [showTokenFor, setShowTokenFor] = useState(null)
@@ -82,8 +81,7 @@ export default function UserManagement() {
   const [toast, setToast] = useState('')
 
   const filtered = users.filter(u =>
-    (!search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.includes(search)) &&
-    (!roleFilter || u.role === roleFilter)
+    (!search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.includes(search))
   )
 
   function toggleLock(email) {
@@ -159,13 +157,6 @@ export default function UserManagement() {
             <span>🔍</span>
             <input placeholder="Tìm tên, email..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-            style={{ padding:'8px 12px', border:'1.5px solid var(--border)', borderRadius:'8px', fontSize:'13px', background:'#fff', cursor:'pointer' }}>
-            <option value="">Tất cả role</option>
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-            <option value="customer">Customer</option>
-          </select>
         </div>
 
         {/* Stats row */}

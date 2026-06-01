@@ -2,7 +2,10 @@ _format_version: "3.0"
 
 services:
   - name: backend-service
-    url: http://api-backend:9000
+    url: https://api-backend:9000
+    # D1 dùng CA self-signed; upstream vẫn được mã hóa TLS.
+    # Nếu muốn verify upstream chặt hơn, import ca.crt vào Kong và bật tls_verify.
+    tls_verify: false
 
     routes:
       - name: users-route
@@ -25,13 +28,20 @@ services:
           - /api/v1/auth
         strip_path: false
 
+      - name: security-route
+        paths:
+          - /api/v1/security
+        strip_path: false
+
       - name: health-route
         paths:
           - /health
+        strip_path: false
 
       - name: root-route
         paths:
           - /
+        strip_path: false
 
 plugins:
   # JWT verification is handled dynamically in backend/app/security/jwt_verify.py

@@ -24,20 +24,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);d
 .sb-logo{padding:22px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px;}
 .sb-logo-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;}
 .sb-logo-name{font-family:'DM Serif Display',serif;color:#fff;font-size:16px;line-height:1.1;}
-.sb-logo-sub{font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;}
 .sb-nav{flex:1;padding:14px 10px;overflow-y:auto;}
-.sb-section{font-size:10px;color:rgba(255,255,255,.28);letter-spacing:.1em;text-transform:uppercase;padding:12px 10px 5px;}
-.sb-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13px;color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s;text-decoration:none;margin-bottom:1px;}
+.sb-section{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.1em;text-transform:uppercase;padding:12px 10px 5px;}
+.sb-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13px;color:rgba(255,255,255,.78);cursor:pointer;transition:all .15s;text-decoration:none;margin-bottom:1px;}
 .sb-item:hover{background:rgba(255,255,255,.07);color:#fff;}
 .sb-item.active{background:rgba(200,75,47,.22);color:#e8785f;}
-.sb-icon{font-size:14px;width:18px;text-align:center;}
+.sb-icon{font-size:14px;width:18px;text-align:center;color:currentColor;text-shadow:0 0 0 currentColor;}
 .sb-badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;}
 .sb-footer{padding:14px;border-top:1px solid rgba(255,255,255,.08);}
 .sb-user{display:flex;align-items:center;gap:9px;}
 .sb-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0;}
-.sb-uname{font-size:12.5px;color:#fff;font-weight:500;line-height:1.2;}
-.sb-urole{font-size:10px;color:rgba(255,255,255,.32);}
-.sb-logout{margin-left:auto;cursor:pointer;color:rgba(255,255,255,.28);font-size:16px;transition:color .15s;background:none;border:none;}
+.sb-user-meta{min-width:0;display:flex;flex-direction:column;gap:2px;}
+.sb-uname{font-size:12.5px;color:#fff;font-weight:500;line-height:1.2;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-urole{font-size:10px;color:rgba(255,255,255,.58);}
+.sb-logout{margin-left:auto;cursor:pointer;color:rgba(255,255,255,.72);font-size:16px;transition:color .15s;background:none;border:none;}
 .sb-logout:hover{color:var(--accent);}
 
 /* ── CUSTOMER NAVBAR (CustomerLayout) ── */
@@ -45,10 +45,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);d
 .nav-brand{font-family:'DM Serif Display',serif;color:#fff;font-size:17px;display:flex;align-items:center;gap:8px;}
 .nav-brand-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
 .nav-links{display:flex;gap:4px;flex:1;margin-left:16px;}
-.nav-link{padding:7px 14px;border-radius:7px;font-size:13px;color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s;text-decoration:none;}
+.nav-link{padding:7px 14px;border-radius:7px;font-size:13px;color:rgba(255,255,255,.78);cursor:pointer;transition:all .15s;text-decoration:none;}
 .nav-link:hover{color:#fff;background:rgba(255,255,255,.07);}
 .nav-link.active{color:#fff;background:rgba(200,75,47,.25);}
 .nav-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+.tb-user{display:flex;align-items:center;gap:8px;max-width:220px;color:#fff;font-size:12.5px;}
+.tb-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;}
+.tb-name{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .nav-cart{position:relative;cursor:pointer;}
 .nav-cart-dot{position:absolute;top:-3px;right:-3px;width:14px;height:14px;background:var(--accent);border-radius:50%;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700;}
 
@@ -61,7 +64,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);d
 .topbar-title{font-size:15px;font-weight:600;}
 .topbar-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
-.tb-icon{width:34px;height:34px;border-radius:8px;background:var(--cream);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;position:relative;}
+.tb-icon{width:34px;height:34px;border-radius:8px;background:var(--cream);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;position:relative;color:var(--ink);}
 .tb-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;background:var(--accent);border-radius:50%;border:2px solid #fff;}
 .search-box{display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:8px;padding:0 11px;background:#fff;width:200px;}
 .search-box input{border:none;background:none;outline:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);width:100%;padding:7px 0;}
@@ -104,7 +107,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);d
 .kpi-change{font-size:11.5px;display:flex;align-items:center;gap:4px;}
 .kpi-change.up{color:var(--green);}
 .kpi-change.dn{color:var(--accent);}
-.kpi-bg-icon{position:absolute;right:16px;top:14px;font-size:28px;opacity:.1;}
+.kpi-bg-icon{position:absolute;right:16px;top:14px;font-size:28px;opacity:.42;filter:saturate(1.25) contrast(1.1);}
 
 /* ── GRID LAYOUTS ── */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
@@ -208,7 +211,7 @@ tr:hover td{background:#faf8f4;cursor:pointer;}
 .empty-text{font-size:14px;}
 .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;}
 .security-note{display:flex;align-items:center;gap:7px;padding:10px 13px;background:#f0faf4;border:1px solid #c8e6d4;border-radius:8px;font-size:11.5px;color:var(--green);margin-top:14px;}
-.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s;}
+.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;color:var(--ink);}
 .icon-btn:hover{border-color:var(--ink);background:var(--cream);}
 .action-cell{display:flex;gap:5px;}
 
@@ -216,7 +219,7 @@ tr:hover td{background:#faf8f4;cursor:pointer;}
 .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
 .product-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:transform .18s,box-shadow .18s;cursor:pointer;}
 .product-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.09);}
-.product-img{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;}
+.product-img{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:56px;position:relative;text-shadow:0 2px 0 rgba(15,14,13,.08);font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;}
 .product-body{padding:14px;}
 .product-name{font-size:13.5px;font-weight:600;margin-bottom:3px;}
 .product-cat{font-size:11px;color:var(--muted);margin-bottom:9px;}
@@ -266,7 +269,7 @@ tr:hover td{background:#faf8f4;cursor:pointer;}
 .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
 .pcard{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:transform .18s,box-shadow .18s;cursor:pointer;}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.09);}
-.pimg{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:52px;}
+.pimg{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:56px;text-shadow:0 2px 0 rgba(15,14,13,.08);font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;}
 .pbody{padding:14px;}
 .pname{font-size:13.5px;font-weight:600;margin-bottom:3px;}
 .pdesc{font-size:11.5px;color:var(--muted);margin-bottom:10px;}
@@ -283,7 +286,7 @@ tr:hover td{background:#faf8f4;cursor:pointer;}
 .empty-text{font-size:14px;}
 .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;}
 .security-note{display:flex;align-items:center;gap:7px;padding:10px 13px;background:#f0faf4;border:1px solid #c8e6d4;border-radius:8px;font-size:11.5px;color:var(--green);margin-top:14px;}
-.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s;}
+.icon-btn{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;color:var(--ink);}
 .icon-btn:hover{border-color:var(--ink);background:var(--cream);}
 .action-cell{display:flex;gap:5px;}
 
@@ -291,7 +294,7 @@ tr:hover td{background:#faf8f4;cursor:pointer;}
 .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
 .product-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:transform .18s,box-shadow .18s;cursor:pointer;}
 .product-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.09);}
-.product-img{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;}
+.product-img{height:150px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:56px;position:relative;text-shadow:0 2px 0 rgba(15,14,13,.08);font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;}
 .product-body{padding:14px;}
 .product-name{font-size:13.5px;font-weight:600;margin-bottom:3px;}
 .product-cat{font-size:11px;color:var(--muted);margin-bottom:9px;}

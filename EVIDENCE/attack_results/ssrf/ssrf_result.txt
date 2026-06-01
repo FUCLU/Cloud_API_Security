@@ -1,0 +1,65 @@
+{
+  "title": "SSRF outbound URL guard evidence",
+  "timestamp_utc": "2026-06-01T04:10:52.808566+00:00",
+  "expected_security_property": "Block metadata, loopback, private, link-local, reserved IPs and non-http schemes.",
+  "result": "PASS",
+  "passed_cases": 6,
+  "total_cases": 6,
+  "cases": [
+    {
+      "name": "block_aws_metadata_ip",
+      "url": "http://169.254.169.254/latest/meta-data/",
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "reason": "SSRF blocked: unsafe ip 169.254.169.254",
+      "passed": true
+    },
+    {
+      "name": "block_loopback_ip",
+      "url": "http://127.0.0.1:8000/admin",
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "reason": "SSRF blocked: unsafe ip 127.0.0.1",
+      "passed": true
+    },
+    {
+      "name": "block_localhost_hostname",
+      "url": "http://localhost:8000/admin",
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "reason": "SSRF blocked: localhost hostname",
+      "passed": true
+    },
+    {
+      "name": "block_private_ip",
+      "url": "http://10.0.0.5/internal",
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "reason": "SSRF blocked: unsafe ip 10.0.0.5",
+      "passed": true
+    },
+    {
+      "name": "block_file_scheme",
+      "url": "file:///etc/passwd",
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "reason": "SSRF blocked: scheme not allowed",
+      "passed": true
+    },
+    {
+      "name": "allow_public_https_ip",
+      "url": "https://93.184.216.34/",
+      "expected_allowed": true,
+      "actual_allowed": true,
+      "reason": {
+        "allowed": true,
+        "scheme": "https",
+        "hostname": "93.184.216.34",
+        "resolved_ips": [
+          "93.184.216.34"
+        ]
+      },
+      "passed": true
+    }
+  ]
+}

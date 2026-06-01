@@ -8,6 +8,7 @@ export default function CallbackPage() {
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const showDebug = new URLSearchParams(window.location.search).get('debug') === '1'
 
   const callbackInfo = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
@@ -23,7 +24,9 @@ export default function CallbackPage() {
     handleCallback()
       .then(tokens => {
         const expected = sessionStorage.getItem('expected_login_email')
-        const actual = parseToken(tokens.access_token)?.email?.toLowerCase?.()
+        const accessPayload = parseToken(tokens.access_token)
+        const idPayload = parseToken(tokens.id_token)
+        const actual = (accessPayload?.email || idPayload?.email || idPayload?.preferred_username || accessPayload?.preferred_username)?.toLowerCase?.()
         sessionStorage.removeItem('expected_login_email')
 
         if (expected && actual && expected !== actual) {
@@ -60,6 +63,18 @@ export default function CallbackPage() {
     }
   }
 
+  if (!error && !showDebug) {
+    return (
+      <div
+        aria-label="Đang xử lý đăng nhập"
+        style={{
+          minHeight: '100vh',
+          background: '#f8f6f1',
+        }}
+      />
+    )
+  }
+
   return (
     <div
       style={{
@@ -86,38 +101,42 @@ export default function CallbackPage() {
         <p style={{ color: '#6e6a61', marginBottom: 14 }}>
           {error
             ? error
-            : 'Hệ thống đang xác thực và điều hướng theo vai trò. Nếu bạn test script replay, có thể copy URL callback bên dưới.'}
+            : 'Hệ thống đang xác thực phiên đăng nhập và điều hướng theo vai trò.'}
         </p>
 
-        <div
-          style={{
-            background: '#f7f3eb',
-            border: '1px solid #e3dccf',
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 14,
-          }}
-        >
-          <p style={{ fontSize: 12, color: '#6e6a61', marginBottom: 8 }}>Thông tin callback</p>
-          <p style={{ fontSize: 12, wordBreak: 'break-all' }}><b>state:</b> {callbackInfo.state || '(không có)'}</p>
-          <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>session_state:</b> {callbackInfo.sessionState || '(không có)'}</p>
-          <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>iss:</b> {callbackInfo.issuer || '(không có)'}</p>
-          <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>code:</b> {callbackInfo.code || '(không có)'}</p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            onClick={copyCallbackUrl}
+        {showDebug ? (
+          <div
             style={{
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: '1px solid #d4cec4',
-              background: '#fff',
-              cursor: 'pointer',
+              background: '#f7f3eb',
+              border: '1px solid #e3dccf',
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 14,
             }}
           >
-            {copied ? 'Đã copy callback URL' : 'Copy callback URL'}
-          </button>
+            <p style={{ fontSize: 12, color: '#6e6a61', marginBottom: 8 }}>Thông tin callback</p>
+            <p style={{ fontSize: 12, wordBreak: 'break-all' }}><b>state:</b> {callbackInfo.state || '(không có)'}</p>
+            <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>session_state:</b> {callbackInfo.sessionState || '(không có)'}</p>
+            <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>iss:</b> {callbackInfo.issuer || '(không có)'}</p>
+            <p style={{ fontSize: 12, wordBreak: 'break-all', marginTop: 6 }}><b>code:</b> {callbackInfo.code || '(không có)'}</p>
+          </div>
+        ) : null}
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {showDebug ? (
+            <button
+              onClick={copyCallbackUrl}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1px solid #d4cec4',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              {copied ? 'Đã copy callback URL' : 'Copy callback URL'}
+            </button>
+          ) : null}
 
           {error ? (
             <button

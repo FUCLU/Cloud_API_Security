@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { getDisplayName } from '../../auth/userDisplay'
+import { useAuth } from '../../hooks/useAuth'
 
 const PAST_ORDERS = [
   { id:'ORD-1042', date:'28/03/2026 · 14:21', items:'💻 Laptop ASUS VivoBook 15 (x1)', amount:'15,490,000đ', status:'success',  pay:'Chuyển khoản' },
@@ -11,18 +13,15 @@ const SC = { success:'badge-green', pending:'badge-amber', shipping:'badge-blue'
 
 export default function MyOrders() {
   const [selected, setSelected] = useState(null)
+  const { user } = useAuth()
 
   return (
     <div className="page-content">
       <div style={{ marginBottom:'20px' }}>
         <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:'24px', marginBottom:'4px' }}>Đơn hàng của tôi</div>
         <div style={{ fontSize:'13px', color:'var(--muted)' }}>
-          {PAST_ORDERS.length} đơn · Tài khoản: <strong>Nguyễn Văn An</strong>
+          {PAST_ORDERS.length} đơn · Tài khoản: <strong>{getDisplayName(user)}</strong>
         </div>
-      </div>
-
-      <div style={{ background:'#e8f5ee', border:'1px solid #c8e6d4', borderRadius:'10px', padding:'14px 18px', marginBottom:'20px', fontSize:'13px', color:'var(--green)', display:'flex', alignItems:'center', gap:'8px' }}>
-        🔒 <span>Bạn chỉ có thể xem đơn hàng của chính mình. Truy cập đơn hàng người khác sẽ bị <strong>OPA từ chối và ghi log</strong>.</span>
       </div>
 
       {PAST_ORDERS.map(o => (

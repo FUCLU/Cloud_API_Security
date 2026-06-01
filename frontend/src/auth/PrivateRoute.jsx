@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { canAccessRoute } from './roleAccess'
 
 export default function PrivateRoute({ children, roles = [] }) {
   const { isAuthenticated, user, authReady } = useAuth()
@@ -7,7 +8,7 @@ export default function PrivateRoute({ children, roles = [] }) {
   if (!authReady) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
-        Dang kiem tra phien dang nhap...
+        Đang kiểm tra phiên đăng nhập...
       </div>
     )
   }
@@ -15,8 +16,7 @@ export default function PrivateRoute({ children, roles = [] }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   if (roles.length > 0) {
-    const hasRole = roles.some(r => user?.roles?.includes(r))
-    if (!hasRole) return <Navigate to="/unauthorized" replace />
+    if (!canAccessRoute(user?.roles ?? [], roles)) return <Navigate to="/unauthorized" replace />
   }
 
   return children

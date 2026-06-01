@@ -38,7 +38,7 @@ Các vector tấn công API phổ biến nhất với SME (BOLA, JWT alg=none, D
 Giải pháp mật mã 3 lớp (TLS 1.3 + AES-256-GCM AEAD + Envelope Encryption KEK/DEK) có đảm bảo confidentiality và integrity toàn diện cho dữ liệu in-transit và at-rest không?
 
 **RQ4 — Vận hành:**  
-Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤ 24h trong điều kiện lab với HashiCorp Vault Transit Engine không?
+Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤ 24h trong điều kiện kiểm thử với HashiCorp Vault Transit Engine không?
 
 ---
 
@@ -46,7 +46,7 @@ Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤
 
 > Một stack gồm **Kong API Gateway** (rate limit + WAF + JWT validation) + **Keycloak** (OIDC/PKCE) + **OPA** (deny-by-default RBAC→ABAC) + **HashiCorp Vault** (envelope encryption KEK/DEK) + **AES-256-GCM** (AEAD at-rest) sẽ:
 >
-> 1. Chặn **100%** các cuộc tấn công JWT alg=none, DPoP replay, và BOLA/IDOR trong điều kiện lab.
+> 1. Chặn **100%** các cuộc tấn công JWT alg=none, DPoP replay, và BOLA/IDOR trong điều kiện kiểm thử.
 > 2. Đảm bảo **0 byte** plaintext rò rỉ trên kênh TLS 1.3.
 > 3. Đạt SLA key rotation **≤ 10 phút** và phát hiện toàn bộ tamper qua AEAD auth tag.
 > 4. Cho phép **100%** quyết định AuthZ được giải thích từ OPA decision log.
@@ -56,7 +56,7 @@ Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤
 ## 5. Phạm vi & Giới hạn
 
 **Trong phạm vi:**
-- Deployment D1: Docker Compose — môi trường lab một máy
+- Deployment D1: Docker Compose — môi trường kiểm thử một máy
 - Deployment D2: Linux VM Ubuntu 22.04 + mTLS east-west
 - Các attack vector: JWT alg=none, DPoP replay, BOLA/IDOR, nonce reuse
 - Đánh giá theo 6 invariants (I1–I6) đo lường được
@@ -68,7 +68,7 @@ Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤
 - WAF rule tuning dựa trên traffic thực
 
 **Giới hạn đạo đức:**
-- Pentest chỉ thực hiện trên lab infrastructure tự kiểm soát
+- Pentest chỉ thực hiện trên hạ tầng kiểm thử tự kiểm soát
 - Toàn bộ dữ liệu test là synthetic — không dùng dữ liệu người dùng thật
 - Logs được sanitize trước khi đưa vào EVIDENCE/
 

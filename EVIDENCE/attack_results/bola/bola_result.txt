@@ -1,0 +1,65 @@
+{
+  "title": "BOLA/IDOR object-level authorization evidence",
+  "timestamp_utc": "2026-06-01T04:10:52.895159+00:00",
+  "expected_security_property": "A customer cannot read another customer's order; staff/admin can operate orders.",
+  "result": "PASS",
+  "passed_cases": 5,
+  "total_cases": 5,
+  "cases": [
+    {
+      "name": "customer_reads_own_order",
+      "order_owner_id": "customer-a",
+      "token_sub": "customer-a",
+      "roles": [
+        "customer"
+      ],
+      "expected_allowed": true,
+      "actual_allowed": true,
+      "passed": true
+    },
+    {
+      "name": "customer_reads_other_customer_order_bola_attack",
+      "order_owner_id": "victim-customer",
+      "token_sub": "attacker-customer",
+      "roles": [
+        "customer"
+      ],
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "passed": true
+    },
+    {
+      "name": "customer_missing_subject_denied",
+      "order_owner_id": "victim-customer",
+      "token_sub": null,
+      "roles": [
+        "customer"
+      ],
+      "expected_allowed": false,
+      "actual_allowed": false,
+      "passed": true
+    },
+    {
+      "name": "staff_operational_access_allowed",
+      "order_owner_id": "victim-customer",
+      "token_sub": "staff-1",
+      "roles": [
+        "staff"
+      ],
+      "expected_allowed": true,
+      "actual_allowed": true,
+      "passed": true
+    },
+    {
+      "name": "admin_operational_access_allowed",
+      "order_owner_id": "victim-customer",
+      "token_sub": "admin-1",
+      "roles": [
+        "admin"
+      ],
+      "expected_allowed": true,
+      "actual_allowed": true,
+      "passed": true
+    }
+  ]
+}

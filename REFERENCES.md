@@ -29,15 +29,15 @@ URL: https://datatracker.ietf.org/doc/html/rfc7519
 
 **[REF-4]** Jones, M., & Hildebrand, J. *RFC 7515 — JSON Web Signature (JWS)*. Internet Engineering Task Force, May 2015.
 URL: https://datatracker.ietf.org/doc/html/rfc7515
-> **Áp dụng:** Cơ sở kỹ thuật cho ký số token RS256 (Keycloak v24.0 + RSA-2048/4096); xác minh chữ ký JWKS endpoint `http://localhost:8081/realms/lab/protocol/openid-connect/certs`; kiểm tra `e_z2_token_hardening.sh` (invariant I4).
+> **Áp dụng:** Cơ sở kỹ thuật cho ký số token RS256 (Keycloak v24.0 + RSA-2048/4096); xác minh chữ ký JWKS endpoint `http://localhost:8081/realms/cloudapi/protocol/openid-connect/certs`; kiểm tra `e_z2_token_hardening.sh` (invariant I4).
 
 **[REF-5]** Hardt, D. (Ed.). *RFC 6749 — The OAuth 2.0 Authorization Framework*. Internet Engineering Task Force, October 2012.
 URL: https://datatracker.ietf.org/doc/html/rfc6749
-> **Áp dụng:** Authorization Code Flow (user-facing SPA) và Client Credentials Flow (S2S) được cấu hình trong Keycloak realm `lab` (`idp/keycloak/realm-export.json`); token endpoint `POST /realms/lab/protocol/openid-connect/token`.
+> **Áp dụng:** Authorization Code Flow (user-facing SPA) và Client Credentials Flow (S2S) được cấu hình trong Keycloak realm `cloudapi` (`idp/keycloak/realm-export.json`); token endpoint `POST /realms/cloudapi/protocol/openid-connect/token`.
 
 **[REF-6]** Sakimura, N., Bradley, J., Flinn, T., & Lodderstedt, T. *RFC 7636 — Proof Key for Code Exchange by OAuth Public Clients (PKCE)*. Internet Engineering Task Force, September 2015.
 URL: https://datatracker.ietf.org/doc/html/rfc7636
-> **Áp dụng:** PKCE (S256 method) bắt buộc cho public clients (spa-client) trong Keycloak realm lab; `code_challenge` và `code_verifier` xử lý tại `frontend/src/auth/` với Web Crypto API; bảo vệ chống authorization code interception attack.
+> **Áp dụng:** PKCE (S256 method) bắt buộc cho public clients (spa-client) trong Keycloak realm cloudapi; `code_challenge` và `code_verifier` xử lý tại `frontend/src/auth/` với Web Crypto API; bảo vệ chống authorization code interception attack.
 
 **[REF-7]** Fett, D., Campbell, B., Bradley, J., Lodderstedt, T., Jones, M., & Waite, D. *RFC 9449 — OAuth 2.0 Demonstrating Proof of Possession (DPoP)*. Internet Engineering Task Force, September 2023.
 URL: https://datatracker.ietf.org/doc/html/rfc9449
@@ -45,7 +45,7 @@ URL: https://datatracker.ietf.org/doc/html/rfc9449
 
 **[REF-8]** Sakimura, N., Bradley, J., Jones, M., de Medeiros, B., & Mortimore, C. *OpenID Connect Core 1.0*. OpenID Foundation, November 2014.
 URL: https://openid.net/specs/openid-connect-core-1_0.html
-> **Áp dụng:** OIDC flow hoàn chỉnh qua Keycloak v24.0: Discovery endpoint (`http://localhost:8081/realms/lab/.well-known/openid-configuration`), `id_token` validation, `UserInfo` endpoint, JWKS rotation; realm `lab` cấu hình tại `idp/keycloak/realm-export.json`.
+> **Áp dụng:** OIDC flow hoàn chỉnh qua Keycloak v24.0: Discovery endpoint (`http://localhost:8081/realms/cloudapi/.well-known/openid-configuration`), `id_token` validation, `UserInfo` endpoint, JWKS rotation; realm `cloudapi` cấu hình tại `idp/keycloak/realm-export.json`.
 
 ---
 
@@ -53,7 +53,7 @@ URL: https://openid.net/specs/openid-connect-core-1_0.html
 
 **[REF-9]** Grassi, P., Garcia, M., & Fenton, J. *NIST Special Publication 800-63B — Digital Identity Guidelines: Authentication and Lifecycle Management*. National Institute of Standards and Technology, 2017 (updated 2022).
 URL: https://pages.nist.gov/800-63-3/sp800-63b.html
-> **Áp dụng:** TOTP (HMAC-based OTP, AAL2) triển khai tại `backend/app/security/totp_verify.py` với thư viện `pyotp==2.9.0`; refresh token rotation + reuse-detection (Keycloak realm lab); token TTL 15 phút; kiểm thử tại `scripts/evaluation/e_n1_totp_test.py` — 100 tests, false-accept=0 (invariant I4, I7).
+> **Áp dụng:** TOTP (HMAC-based OTP, AAL2) triển khai tại `backend/app/security/totp_verify.py` với thư viện `pyotp==2.9.0`; refresh token rotation + reuse-detection (Keycloak realm cloudapi); token TTL 15 phút; kiểm thử tại `scripts/evaluation/e_n1_totp_test.py` — 100 tests, false-accept=0 (invariant I4, I7).
 
 **[REF-10]** Barker, E. *NIST Special Publication 800-57 Part 1 Rev. 5 — Recommendation for Key Management*. National Institute of Standards and Technology, May 2020.
 URL: https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-5/final
@@ -75,7 +75,7 @@ URL: https://docs.konghq.com/gateway/latest/
 **[TOOL-2] Keycloak v24.0**
 Red Hat / Keycloak Community. *Keycloak — Open Source Identity and Access Management*. 2024.
 URL: https://www.keycloak.org/documentation
-> **Vai trò trong project:** Identity Provider (IdP); OIDC/OAuth 2.0 Authorization Server; PKCE flow (spa-client), Client Credentials flow (backend-client), refresh token rotation với reuse-detection, TOTP MFA bắt buộc admin, JWKS endpoint cho Kong fetch. Realm: **`lab`**. Container: `quay.io/keycloak/keycloak:24.0`, port `:8081`.
+> **Vai trò trong project:** Identity Provider (IdP); OIDC/OAuth 2.0 Authorization Server; PKCE flow (spa-client), Client Credentials flow (backend-client), refresh token rotation với reuse-detection, TOTP MFA bắt buộc admin, JWKS endpoint cho Kong fetch. Realm: **`cloudapi`**. Container: `quay.io/keycloak/keycloak:24.0`, port `:8081`.
 
 **[TOOL-3] HashiCorp Vault v1.15**
 HashiCorp. *Vault — Secrets Management & Encryption as a Service*. 2024.
@@ -127,7 +127,7 @@ Tất cả phiên bản tool trong REFERENCES.md đã được đồng bộ vớ
 | Tool | Image trong docker-compose | Version trong REF |
 |---|---|---|
 | Kong | `kong:3.6` | v3.6 ✅ |
-| Keycloak | `quay.io/keycloak/keycloak:24.0` | v24.0, realm=**lab** ✅ |
+| Keycloak | `quay.io/keycloak/keycloak:24.0` | v24.0, realm=**cloudapi** ✅ |
 | OPA | `openpolicyagent/opa:0.65.0` | v0.65.0 ✅ |
 | Vault | `hashicorp/vault:1.15` | **v1.15** ✅ |
 | PostgreSQL | `postgres:16` | v16 ✅ |

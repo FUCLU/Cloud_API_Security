@@ -80,7 +80,7 @@ export async function loginWithPassword(email, password, totp = '') {
 
   if (!res.ok) {
     const err = await res.json()
-    throw new Error(err.error_description ?? 'Dang nhap that bai')
+    throw new Error(err.error_description ?? 'Đăng nhập thất bại')
   }
 
   return res.json()
@@ -163,7 +163,10 @@ export function logout(idToken) {
 
 export function parseToken(token) {
   try {
-    return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const binary = atob(base64)
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes))
   } catch {
     return null
   }

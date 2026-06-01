@@ -16,13 +16,11 @@ const SC = { ok:'badge-green', low:'badge-amber', out:'badge-red' }
 
 export default function StaffProducts() {
   const [search, setSearch] = useState('')
-  const [stockF, setStockF] = useState('')
   const [editProd, setEditProd] = useState(null)
   const [newStock, setNewStock] = useState('')
 
   const filtered = SPRODS.filter(p =>
-    (!search || p.n.toLowerCase().includes(search.toLowerCase())) &&
-    (!stockF || p.s === stockF)
+    (!search || p.n.toLowerCase().includes(search.toLowerCase()))
   )
 
   return (
@@ -30,12 +28,6 @@ export default function StaffProducts() {
       <div className="topbar">
         <div>
           <div className="topbar-title">Sản phẩm</div>
-          <div className="topbar-sub">Staff — xem & cập nhật tồn kho (không thể xoá)</div>
-        </div>
-        <div className="topbar-right">
-          <div style={{ padding:'7px 14px', background:'#fff4e8', border:'1px solid #f5c8a0', borderRadius:'8px', fontSize:'12px', color:'var(--amber)' }}>
-            ⚠️ Staff không có quyền thêm / xoá sản phẩm
-          </div>
         </div>
       </div>
 
@@ -45,12 +37,6 @@ export default function StaffProducts() {
             <span>🔍</span>
             <input placeholder="Tìm sản phẩm..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select value={stockF} onChange={e => setStockF(e.target.value)}>
-            <option value="">Tất cả tồn kho</option>
-            <option value="ok">Còn hàng</option>
-            <option value="low">Sắp hết</option>
-            <option value="out">Hết hàng</option>
-          </select>
           <span className="filter-count">{filtered.length} sản phẩm</span>
         </div>
 
@@ -106,9 +92,6 @@ export default function StaffProducts() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="security-note">
-                🔒 Thay đổi tồn kho được ghi vào audit log
               </div>
               <div className="modal-footer" style={{ marginTop:'14px' }}>
                 <button className="btn btn-primary" style={{ flex:1 }} onClick={() => setEditProd(null)}>💾 Lưu tồn kho</button>

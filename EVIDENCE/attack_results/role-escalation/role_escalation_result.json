@@ -1,0 +1,146 @@
+{
+  "title": "Frontend role route isolation / privilege escalation evidence",
+  "timestamp_utc": "2026-06-01T05:39:24.454314+00:00",
+  "expected_security_property": "Admin, staff and customer UI areas are isolated by route role guards.",
+  "result": "PASS",
+  "passed_cases": 9,
+  "total_cases": 9,
+  "passed_route_config_cases": 3,
+  "total_route_config_cases": 3,
+  "route_config_cases": [
+    {
+      "name": "admin_route_allows_only_admin",
+      "path": "/admin",
+      "expectedRoles": [
+        "admin"
+      ],
+      "passed": true
+    },
+    {
+      "name": "staff_route_allows_only_staff",
+      "path": "/staff",
+      "expectedRoles": [
+        "staff"
+      ],
+      "passed": true
+    },
+    {
+      "name": "customer_route_allows_only_customer",
+      "path": "/customer",
+      "expectedRoles": [
+        "customer"
+      ],
+      "passed": true
+    }
+  ],
+  "cases": [
+    {
+      "name": "admin_can_access_admin",
+      "userRoles": [
+        "admin"
+      ],
+      "allowedRoles": [
+        "admin"
+      ],
+      "expected": true,
+      "actual": true,
+      "passed": true
+    },
+    {
+      "name": "admin_cannot_access_staff_ui",
+      "userRoles": [
+        "admin"
+      ],
+      "allowedRoles": [
+        "staff"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    },
+    {
+      "name": "admin_cannot_access_customer_ui",
+      "userRoles": [
+        "admin"
+      ],
+      "allowedRoles": [
+        "customer"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    },
+    {
+      "name": "staff_can_access_staff",
+      "userRoles": [
+        "staff"
+      ],
+      "allowedRoles": [
+        "staff"
+      ],
+      "expected": true,
+      "actual": true,
+      "passed": true
+    },
+    {
+      "name": "staff_cannot_access_admin",
+      "userRoles": [
+        "staff"
+      ],
+      "allowedRoles": [
+        "admin"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    },
+    {
+      "name": "staff_cannot_access_customer",
+      "userRoles": [
+        "staff"
+      ],
+      "allowedRoles": [
+        "customer"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    },
+    {
+      "name": "customer_can_access_customer",
+      "userRoles": [
+        "customer"
+      ],
+      "allowedRoles": [
+        "customer"
+      ],
+      "expected": true,
+      "actual": true,
+      "passed": true
+    },
+    {
+      "name": "customer_cannot_access_admin",
+      "userRoles": [
+        "customer"
+      ],
+      "allowedRoles": [
+        "admin"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    },
+    {
+      "name": "customer_cannot_access_staff",
+      "userRoles": [
+        "customer"
+      ],
+      "allowedRoles": [
+        "staff"
+      ],
+      "expected": false,
+      "actual": false,
+      "passed": true
+    }
+  ]
+}

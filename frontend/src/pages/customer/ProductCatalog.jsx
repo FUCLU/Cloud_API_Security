@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 const CPRODS = [
   { n:'Laptop ASUS VivoBook 15',  c:'Điện tử',   p:'15,490,000đ', e:'💻', d:'Core i5, 8GB RAM, 512GB SSD', s:'ok' },
@@ -14,19 +13,16 @@ const CPRODS = [
 
 export default function ProductCatalog() {
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState('')
 
   const filtered = CPRODS.filter(p =>
     p.s !== 'out' &&
-    (!search || p.n.toLowerCase().includes(search.toLowerCase())) &&
-    (!cat || p.c === cat)
+    (!search || p.n.toLowerCase().includes(search.toLowerCase()))
   )
 
   return (
     <div style={{ flex: 1 }}>
       <div className="cat-hero">
         <h2>Khám phá sản phẩm</h2>
-        <p>Tất cả giao dịch được bảo vệ bởi AES-256-GCM · TLS 1.3</p>
       </div>
 
       <div className="cat-content">
@@ -35,10 +31,6 @@ export default function ProductCatalog() {
             <span>🔍</span>
             <input placeholder="Tìm sản phẩm..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select value={cat} onChange={e => setCat(e.target.value)}>
-            <option value="">Tất cả danh mục</option>
-            <option>Điện tử</option><option>Thực phẩm</option><option>Thời trang</option><option>Văn phòng</option>
-          </select>
           <span className="filter-count">{filtered.length} sản phẩm</span>
         </div>
 
