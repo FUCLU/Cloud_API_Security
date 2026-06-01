@@ -1,0 +1,178 @@
+{
+  "generated_at_utc": "2026-06-01T08:58:49.616820+00:00",
+  "frontend_url": "https://localhost:5174",
+  "api_url": "https://localhost:8443",
+  "checks": [
+    {
+      "name": "frontend_https_available",
+      "target": "https://localhost:5174",
+      "expected": "HTTP 200 over trusted local TLS",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "status": 200,
+        "headers": {
+          "server": "nginx/1.29.8",
+          "date": "Mon, 01 Jun 2026 08:58:41 GMT",
+          "content-type": "text/html",
+          "content-length": "403",
+          "last-modified": "Mon, 01 Jun 2026 08:29:14 GMT",
+          "connection": "close",
+          "etag": "\"6a1d42da-193\"",
+          "cache-control": "no-cache, no-store, must-revalidate",
+          "accept-ranges": "bytes"
+        },
+        "body": "<!DOCTYPE html>\r\n<html lang=\"vi\">\r\n  <head>\r\n    <meta charset=\"UTF-8\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title>E-Market</title>\r\n    <script type=\"module\" crossorigin src=\"/assets/index-CI9kV7s-.js\"></script>\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-De7siZd6.css\">\n  </head>\r\n  <body>\r\n    <div id=\"root\"></div>\r\r\n  </body>\r\n</html>"
+      }
+    },
+    {
+      "name": "kong_https_health",
+      "target": "https://localhost:8443/health",
+      "expected": "HTTP 200 and backend status ok through Kong HTTPS",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "content-length": "15",
+          "connection": "close",
+          "ratelimit-reset": "19",
+          "x-ratelimit-remaining-minute": "99",
+          "x-ratelimit-limit-minute": "100",
+          "ratelimit-remaining": "99",
+          "ratelimit-limit": "100",
+          "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+          "server": "uvicorn",
+          "vary": "Origin",
+          "access-control-allow-credentials": "true",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-kong-upstream-latency": "4",
+          "x-kong-proxy-latency": "7987",
+          "via": "kong/3.6.1",
+          "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+        },
+        "body": "{\"status\":\"ok\"}"
+      }
+    },
+    {
+      "name": "security_headers_present",
+      "target": "https://localhost:8443/health",
+      "expected": "HSTS, X-Content-Type-Options and X-Frame-Options are present",
+      "passed": true,
+      "detail": {
+        "headers": {
+          "content-type": "application/json",
+          "content-length": "15",
+          "connection": "close",
+          "ratelimit-reset": "19",
+          "x-ratelimit-remaining-minute": "99",
+          "x-ratelimit-limit-minute": "100",
+          "ratelimit-remaining": "99",
+          "ratelimit-limit": "100",
+          "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+          "server": "uvicorn",
+          "vary": "Origin",
+          "access-control-allow-credentials": "true",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-kong-upstream-latency": "4",
+          "x-kong-proxy-latency": "7987",
+          "via": "kong/3.6.1",
+          "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+        }
+      }
+    },
+    {
+      "name": "rate_limit_headers_present",
+      "target": "https://localhost:8443/health",
+      "expected": "Kong rate-limit headers are present",
+      "passed": true,
+      "detail": {
+        "headers": {
+          "content-type": "application/json",
+          "content-length": "15",
+          "connection": "close",
+          "ratelimit-reset": "19",
+          "x-ratelimit-remaining-minute": "99",
+          "x-ratelimit-limit-minute": "100",
+          "ratelimit-remaining": "99",
+          "ratelimit-limit": "100",
+          "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+          "server": "uvicorn",
+          "vary": "Origin",
+          "access-control-allow-credentials": "true",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-kong-upstream-latency": "4",
+          "x-kong-proxy-latency": "7987",
+          "via": "kong/3.6.1",
+          "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+        }
+      }
+    },
+    {
+      "name": "protected_endpoint_requires_auth",
+      "target": "https://localhost:8443/api/v1/users",
+      "expected": "Missing Authorization is rejected by gateway/backend with 401 or 403",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "status": 403,
+        "headers": {
+          "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+          "content-type": "application/json; charset=utf-8",
+          "connection": "close",
+          "ratelimit-reset": "11",
+          "x-ratelimit-remaining-minute": "98",
+          "x-ratelimit-limit-minute": "100",
+          "ratelimit-remaining": "98",
+          "ratelimit-limit": "100",
+          "content-length": "51",
+          "vary": "Origin",
+          "access-control-allow-credentials": "true",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-kong-response-latency": "3",
+          "server": "kong/3.6.1",
+          "x-kong-request-id": "be30bc7d4cc8b9089b5257591881d251"
+        },
+        "body": "{\"error\":\"Access Denied\",\"reason\":\"forbidden_role\"}"
+      }
+    },
+    {
+      "name": "jwt_alg_none_rejected",
+      "target": "https://localhost:8443/api/v1/users",
+      "expected": "Forged alg=none JWT is rejected",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "status": 401,
+        "headers": {
+          "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+          "content-type": "application/json; charset=utf-8",
+          "connection": "close",
+          "content-length": "34",
+          "vary": "Origin",
+          "access-control-allow-credentials": "true",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-kong-response-latency": "0",
+          "server": "kong/3.6.1",
+          "x-kong-request-id": "0e8c3f0d0c9afd06af59f03f1cc03831"
+        },
+        "body": "{\"message\":\"Invalid token header\"}"
+      }
+    }
+  ],
+  "zap": {
+    "status": "skipped",
+    "reason": "ghcr.io/zaproxy/zaproxy:stable is not available locally; pull it and rerun to execute ZAP baseline."
+  }
+}
