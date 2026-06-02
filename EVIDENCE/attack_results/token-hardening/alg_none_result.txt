@@ -1,5 +1,5 @@
 ~ ALG NONE ATTACK EVIDENCE ~
-timestamp_utc: 2026-06-02T04:41:41.259670+00:00
+timestamp_utc: 2026-06-02T05:55:15.108983+00:00
 target_url: https://localhost:8443/api/v1/users
 attack_goal: Forge unsigned JWT with alg=none and admin role
 defense: Kong jwt-hardening plugin must reject alg=none

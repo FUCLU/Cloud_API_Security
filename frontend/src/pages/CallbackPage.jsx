@@ -8,19 +8,23 @@ export default function CallbackPage() {
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
-  const showDebug = new URLSearchParams(window.location.search).get('debug') === '1'
+  const params = new URLSearchParams(window.location.search)
+  const showDebug = params.get('debug') === '1'
+  const manualCallback = params.get('manual') === '1'
 
   const callbackInfo = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
+    const searchParams = new URLSearchParams(window.location.search)
     return {
-      state: params.get('state') || '',
-      code: params.get('code') || '',
-      sessionState: params.get('session_state') || '',
-      issuer: params.get('iss') || '',
+      state: searchParams.get('state') || '',
+      code: searchParams.get('code') || '',
+      sessionState: searchParams.get('session_state') || '',
+      issuer: searchParams.get('iss') || '',
     }
   }, [])
 
   useEffect(() => {
+    if (manualCallback) return
+
     handleCallback()
       .then(tokens => {
         const expected = sessionStorage.getItem('expected_login_email')
@@ -44,14 +48,15 @@ export default function CallbackPage() {
         sessionStorage.removeItem('pkce_state')
         setError(err.message)
       })
-  }, [initFromTokens, navigate, resetAuth])
+  }, [initFromTokens, manualCallback, navigate, resetAuth])
 
   useEffect(() => {
+    if (manualCallback) return
     if (!user) return
     if (user.roles.includes('admin')) navigate('/admin/dashboard', { replace: true })
     else if (user.roles.includes('staff')) navigate('/staff/dashboard', { replace: true })
     else navigate('/customer/productcatalog', { replace: true })
-  }, [user, navigate])
+  }, [manualCallback, user, navigate])
 
   const copyCallbackUrl = async () => {
     try {
@@ -96,12 +101,14 @@ export default function CallbackPage() {
         }}
       >
         <h2 style={{ marginBottom: 8, color: error ? '#c84b2f' : '#0f0e0d' }}>
-          {error ? 'Đăng nhập thất bại' : 'Đang xử lý đăng nhập'}
+          {error ? 'Đăng nhập thất bại' : manualCallback ? 'Callback test thủ công' : 'Đang xử lý đăng nhập'}
         </h2>
         <p style={{ color: '#6e6a61', marginBottom: 14 }}>
           {error
             ? error
-            : 'Hệ thống đang xác thực phiên đăng nhập và điều hướng theo vai trò.'}
+            : manualCallback
+              ? 'Copy toàn bộ callback URL hoặc giá trị code rồi dán lại vào terminal. Trang này không tự dùng code nên code vẫn còn hợp lệ cho script.'
+              : 'Hệ thống đang xác thực phiên đăng nhập và điều hướng theo vai trò.'}
         </p>
 
         {showDebug ? (

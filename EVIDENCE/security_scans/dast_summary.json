@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-02T03:50:15.912825+00:00",
+  "generated_at_utc": "2026-06-02T05:54:05.696794+00:00",
   "frontend_url": "https://localhost:5174",
   "api_url": "https://localhost:8443",
   "checks": [
@@ -13,7 +13,7 @@
         "status": 200,
         "headers": {
           "server": "nginx/1.29.8",
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "content-type": "text/html",
           "content-length": "403",
           "last-modified": "Mon, 01 Jun 2026 09:44:11 GMT",
@@ -34,7 +34,7 @@
         "ok": false,
         "status": 400,
         "headers": {
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "content-type": "text/html; charset=UTF-8",
           "content-length": "202",
           "connection": "close",
@@ -45,7 +45,7 @@
           "x-frame-options": "DENY",
           "x-kong-response-latency": "0",
           "server": "kong/3.6.1",
-          "x-kong-request-id": "e4635c349f805a343215e13be83c5307"
+          "x-kong-request-id": "8cb3e726d257af3cbcc26f3d6b2f7b75"
         },
         "body": "<html>\r\n<head><title>400 No required SSL certificate was sent</title></head>\r\n<body>\r\n<center><h1>400 Bad Request</h1></center>\r\n<center>No required SSL certificate was sent</center>\r\n</body>\r\n</html>\r\n"
       }
@@ -66,18 +66,18 @@
           "x-ratelimit-limit-minute": "100",
           "ratelimit-remaining": "99",
           "ratelimit-limit": "100",
-          "ratelimit-reset": "44",
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "ratelimit-reset": "55",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "server": "uvicorn",
           "vary": "Origin",
           "access-control-allow-credentials": "true",
           "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
           "x-content-type-options": "nosniff",
           "x-frame-options": "DENY",
-          "x-kong-upstream-latency": "2",
-          "x-kong-proxy-latency": "5",
+          "x-kong-upstream-latency": "6",
+          "x-kong-proxy-latency": "9",
           "via": "kong/3.6.1",
-          "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
+          "x-kong-request-id": "8176614a99bc0326f4604257a6419f4f"
         },
         "body": "{\"status\":\"ok\"}"
       }
@@ -96,18 +96,18 @@
           "x-ratelimit-limit-minute": "100",
           "ratelimit-remaining": "99",
           "ratelimit-limit": "100",
-          "ratelimit-reset": "44",
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "ratelimit-reset": "55",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "server": "uvicorn",
           "vary": "Origin",
           "access-control-allow-credentials": "true",
           "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
           "x-content-type-options": "nosniff",
           "x-frame-options": "DENY",
-          "x-kong-upstream-latency": "2",
-          "x-kong-proxy-latency": "5",
+          "x-kong-upstream-latency": "6",
+          "x-kong-proxy-latency": "9",
           "via": "kong/3.6.1",
-          "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
+          "x-kong-request-id": "8176614a99bc0326f4604257a6419f4f"
         }
       }
     },
@@ -125,18 +125,18 @@
           "x-ratelimit-limit-minute": "100",
           "ratelimit-remaining": "99",
           "ratelimit-limit": "100",
-          "ratelimit-reset": "44",
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "ratelimit-reset": "55",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "server": "uvicorn",
           "vary": "Origin",
           "access-control-allow-credentials": "true",
           "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
           "x-content-type-options": "nosniff",
           "x-frame-options": "DENY",
-          "x-kong-upstream-latency": "2",
-          "x-kong-proxy-latency": "5",
+          "x-kong-upstream-latency": "6",
+          "x-kong-proxy-latency": "9",
           "via": "kong/3.6.1",
-          "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
+          "x-kong-request-id": "8176614a99bc0326f4604257a6419f4f"
         }
       }
     },
@@ -149,23 +149,23 @@
         "ok": false,
         "status": 403,
         "headers": {
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "content-type": "application/json; charset=utf-8",
           "connection": "close",
           "x-ratelimit-remaining-minute": "98",
           "x-ratelimit-limit-minute": "100",
           "ratelimit-remaining": "98",
           "ratelimit-limit": "100",
-          "ratelimit-reset": "44",
+          "ratelimit-reset": "55",
           "content-length": "51",
           "vary": "Origin",
           "access-control-allow-credentials": "true",
           "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
           "x-content-type-options": "nosniff",
           "x-frame-options": "DENY",
-          "x-kong-response-latency": "3",
+          "x-kong-response-latency": "4",
           "server": "kong/3.6.1",
-          "x-kong-request-id": "eae36639ce35f22c9be0f5515b460066"
+          "x-kong-request-id": "f57cb649b21e8e24bd358772feb91b66"
         },
         "body": "{\"reason\":\"forbidden_role\",\"error\":\"Access Denied\"}"
       }
@@ -179,7 +179,7 @@
         "ok": false,
         "status": 401,
         "headers": {
-          "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+          "date": "Tue, 02 Jun 2026 05:54:05 GMT",
           "content-type": "application/json; charset=utf-8",
           "connection": "close",
           "content-length": "34",
@@ -190,7 +190,7 @@
           "x-frame-options": "DENY",
           "x-kong-response-latency": "1",
           "server": "kong/3.6.1",
-          "x-kong-request-id": "dc6b0e28671be929691dbf73227d5835"
+          "x-kong-request-id": "0452b87cb0b142641da13c6b6fd60855"
         },
         "body": "{\"message\":\"Invalid token header\"}"
       }

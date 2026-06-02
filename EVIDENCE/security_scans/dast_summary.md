@@ -1,6 +1,6 @@
 # DAST Evidence Summary
 
-- generated_at_utc: 2026-06-02T03:50:15.913889+00:00
+- generated_at_utc: 2026-06-02T05:54:05.697853+00:00
 - checks_passed: 7/7
 - html_report: `EVIDENCE/security_scans/zap_report.html`
 - json_report: `EVIDENCE/security_scans/dast_summary.json`

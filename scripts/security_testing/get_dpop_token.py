@@ -34,7 +34,7 @@ KEYCLOAK_TOKEN_URL = os.getenv(
 )
 CLIENT_ID = os.getenv("CLIENT_ID", "spa-client")
 AUTH_FLOW = os.getenv("AUTH_FLOW", "authorization_code").strip().lower()
-REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:5173/callback")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "https://localhost:5174/callback?manual=1&debug=1")
 AUTH_CODE = os.getenv("AUTH_CODE", "").strip()
 KC_USERNAME = os.getenv("KC_USERNAME", os.getenv("ATTACK_USERNAME", "an@gmail.com"))
 KC_PASSWORD = os.getenv("KC_PASSWORD", os.getenv("ATTACK_PASSWORD", "demo1234"))
@@ -135,6 +135,8 @@ def get_token_authorization_code(private_key: ec.EllipticCurvePrivateKey) -> dic
     print("[Step 2] Mở URL đăng nhập Keycloak để lấy authorization code")
     print(f"  Auth URL: {auth_url}")
     print(f"  Redirect URI kỳ vọng: {REDIRECT_URI}")
+    print("  Sau khi đăng nhập, trang callback sẽ dừng lại và hiện code để copy.")
+    print("  Lưu ý: code chỉ dùng được một lần và hết hạn nhanh.")
     auth_code = parse_code_from_input(AUTH_CODE)
     if not auth_code:
         user_input = input("  Dán toàn bộ callback URL hoặc chỉ giá trị code: ").strip()
