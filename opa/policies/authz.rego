@@ -70,6 +70,12 @@ allow {
 }
 
 allow {
+  input.role == "customer"
+  input.method == "POST"
+  startswith(input.path, "/api/v1/orders")
+}
+
+allow {
   startswith(input.path, "/webhooks/")
   input.hmac_verified == true
 }

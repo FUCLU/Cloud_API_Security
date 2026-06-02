@@ -16,12 +16,19 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "EVIDENCE" / "security_scans"
 REPORT_HTML = EVIDENCE / "zap_report.html"
 SUMMARY_JSON = EVIDENCE / "dast_summary.json"
 SUMMARY_MD = EVIDENCE / "dast_summary.md"
+CA_CERT = ROOT / "certs" / "ca.crt"
+CLIENT_CERT = ROOT / "certs" / "client.crt"
+CLIENT_KEY = ROOT / "certs" / "client.key"
 
 
 def now() -> str:
@@ -51,8 +58,16 @@ def forged_alg_none_token() -> str:
     return f"{header}.{payload}."
 
 
-def request(url: str, method: str = "GET", headers: dict[str, str] | None = None, timeout: int = 15) -> dict:
-    ctx = ssl.create_default_context(cafile=str(ROOT / "certs" / "ca.crt"))
+def request(
+    url: str,
+    method: str = "GET",
+    headers: dict[str, str] | None = None,
+    timeout: int = 15,
+    client_cert: bool = True,
+) -> dict:
+    ctx = ssl.create_default_context(cafile=str(CA_CERT))
+    if client_cert and CLIENT_CERT.exists() and CLIENT_KEY.exists():
+        ctx.load_cert_chain(certfile=str(CLIENT_CERT), keyfile=str(CLIENT_KEY))
     req = urllib.request.Request(url, method=method, headers=headers or {})
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
@@ -85,6 +100,95 @@ def test(name: str, target: str, expected: str, passed: bool, detail: dict) -> d
     }
 
 
+def summarize_detail(item: dict) -> str:
+    detail = item.get("detail", {})
+    name = item.get("name", "")
+    status = detail.get("status")
+    headers = detail.get("headers", {})
+    body = detail.get("body", "")
+    error = detail.get("error", "")
+
+    if name == "frontend_https_available":
+        if item["passed"]:
+            return f"Frontend trả HTTP {status} qua HTTPS với CA nội bộ."
+        return f"Frontend chưa truy cập được qua HTTPS: {error or status}"
+
+    if name == "kong_requires_client_certificate":
+        if item["passed"]:
+            return "Không gửi client cert thì Kong chặn trước khi vào backend."
+        return f"Kong chưa chặn request thiếu client cert: status={status}, error={error}"
+
+    if name == "kong_https_health":
+        if item["passed"]:
+            return f"Kong forward tới backend thành công, HTTP {status}, body={body.strip()!r}."
+        return f"Kong health fail: status={status}, error={error}, body={body.strip()!r}"
+
+    if name == "security_headers_present":
+        present = [
+            key
+            for key in ["strict-transport-security", "x-content-type-options", "x-frame-options"]
+            if key in headers
+        ]
+        return "Headers tìm thấy: " + (", ".join(present) if present else "không có")
+
+    if name == "rate_limit_headers_present":
+        present = [
+            key
+            for key in ["x-ratelimit-limit-minute", "x-ratelimit-remaining-minute", "ratelimit-limit"]
+            if key in headers
+        ]
+        return "Rate-limit headers: " + (", ".join(present) if present else "không có")
+
+    if name == "protected_endpoint_requires_auth":
+        if item["passed"]:
+            return f"Không gửi Authorization bị chặn với HTTP {status}."
+        return f"Endpoint protected không chặn đúng: status={status}, body={body.strip()!r}"
+
+    if name == "jwt_alg_none_rejected":
+        if item["passed"]:
+            return f"JWT giả mạo alg=none bị chặn với HTTP {status}."
+        return f"JWT alg=none chưa bị chặn đúng: status={status}, body={body.strip()!r}"
+
+    if error:
+        return error
+    if status is not None:
+        return f"HTTP {status}"
+    return json.dumps(detail, ensure_ascii=False)[:180]
+
+
+def print_console_report(checks: list[dict], zap: dict) -> None:
+    passed = sum(1 for item in checks if item["passed"])
+
+    print("\n=== DAST SECURITY REPORT ===")
+    print("Mục tiêu: kiểm thử black-box qua HTTPS giống góc nhìn attacker bên ngoài.")
+    print("Phạm vi:")
+    print("  - Frontend HTTPS")
+    print("  - Kong API Gateway HTTPS/mTLS")
+    print("  - Security headers")
+    print("  - Rate limiting")
+    print("  - Auth bắt buộc")
+    print("  - JWT alg=none hardening")
+    print()
+
+    for index, item in enumerate(checks, start=1):
+        status = "PASS" if item["passed"] else "FAIL"
+        print(f"[{index}] {status} - {item['name']}")
+        print(f"    Target : {item['target']}")
+        print(f"    Kỳ vọng: {item['expected']}")
+        print(f"    Bằng chứng: {summarize_detail(item)}")
+        print()
+
+    print("=== TỔNG KẾT ===")
+    print(f"Checks passed: {passed}/{len(checks)}")
+    print(f"ZAP status   : {zap.get('status')}")
+    if zap.get("reason"):
+        print(f"ZAP reason   : {zap.get('reason')}")
+    print(f"HTML report  : {rel(REPORT_HTML)}")
+    print(f"JSON report  : {rel(SUMMARY_JSON)}")
+    print(f"MD summary   : {rel(SUMMARY_MD)}")
+    print("============================\n")
+
+
 def run_builtin_checks(frontend_url: str, api_url: str) -> list[dict]:
     checks: list[dict] = []
 
@@ -100,6 +204,27 @@ def run_builtin_checks(frontend_url: str, api_url: str) -> list[dict]:
     )
 
     health_url = f"{api_url.rstrip('/')}/health"
+    no_client_cert = request(health_url, method="GET", client_cert=False)
+    checks.append(
+        test(
+            "kong_requires_client_certificate",
+            health_url,
+            "Kong mTLS rejects requests that do not present a trusted client certificate",
+            (
+                no_client_cert.get("status") == 400
+                and "ssl certificate" in no_client_cert.get("body", "").lower()
+            )
+            or (
+                no_client_cert.get("status") is None
+                and any(
+                    text in no_client_cert.get("error", "").lower()
+                    for text in ["certificate required", "tlsv13 alert", "handshake", "certificate"]
+                )
+            ),
+            no_client_cert,
+        )
+    )
+
     health = request(health_url, method="GET")
     headers = health.get("headers", {})
     checks.append(
@@ -257,11 +382,23 @@ def write_markdown(checks: list[dict], zap: dict) -> None:
         f"- json_report: `{rel(SUMMARY_JSON)}`",
         f"- zap_status: {zap.get('status')}",
         "",
+        "## Ý nghĩa",
+        "",
+        "Báo cáo này là kiểm thử black-box qua HTTPS, mô phỏng cách một client/attacker bên ngoài nhìn thấy hệ thống.",
+        "Các request hợp lệ qua Kong dùng CA nội bộ và client certificate `certs/client.crt` + `certs/client.key`.",
+        "",
         "## Checks",
         "",
     ]
     for item in checks:
-        lines.append(f"- {'PASS' if item['passed'] else 'FAIL'} `{item['name']}` - {item['expected']}")
+        lines += [
+            f"### {'PASS' if item['passed'] else 'FAIL'} `{item['name']}`",
+            "",
+            f"- Target: `{item['target']}`",
+            f"- Kỳ vọng: {item['expected']}",
+            f"- Bằng chứng: {summarize_detail(item)}",
+            "",
+        ]
     if zap.get("status") == "skipped":
         lines += [
             "",
@@ -296,10 +433,7 @@ def main() -> int:
     write_markdown(checks, zap)
 
     passed = sum(1 for item in checks if item["passed"])
-    print(f"DAST HTML written: {rel(REPORT_HTML)}")
-    print(f"DAST JSON written: {rel(SUMMARY_JSON)}")
-    print(f"Summary written:   {rel(SUMMARY_MD)}")
-    print(f"Built-in checks: {passed}/{len(checks)} passed; ZAP status: {zap.get('status')}")
+    print_console_report(checks, zap)
     return 1 if args.strict and passed != len(checks) else 0
 
 

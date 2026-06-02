@@ -1,16 +1,29 @@
+#!/usr/bin/env python3
+"""DPoP replay attack evidence script without external JWT dependency."""
+
+from __future__ import annotations
+
 import base64
 import hashlib
+import json
 import os
 import secrets
+import sys
 import time
 import urllib.parse
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-import jwt
 import requests
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 KEYCLOAK_TOKEN_URL = os.getenv(
     "KEYCLOAK_TOKEN_URL",
@@ -22,12 +35,14 @@ KEYCLOAK_AUTH_URL = os.getenv(
 )
 API_URL = os.getenv("API_URL", "https://localhost:8443/api/v1/products")
 CLIENT_ID = os.getenv("CLIENT_ID", "spa-client")
-ATTACK_USERNAME = os.getenv("ATTACK_USERNAME", "an@gmail.com")
-ATTACK_PASSWORD = os.getenv("ATTACK_PASSWORD", "demo1234")
 AUTH_FLOW = os.getenv("AUTH_FLOW", "authorization_code").strip().lower()
 REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:5173/callback")
 AUTH_CODE = os.getenv("AUTH_CODE", "").strip()
-VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
+ATTACK_USERNAME = os.getenv("ATTACK_USERNAME", "an@gmail.com")
+ATTACK_PASSWORD = os.getenv("ATTACK_PASSWORD", "demo1234")
+TLS_CA_CERT = os.getenv("TLS_CA_CERT", "certs/ca.crt")
+CLIENT_CERT = os.getenv("CLIENT_CERT", "certs/client.crt")
+CLIENT_KEY = os.getenv("CLIENT_KEY", "certs/client.key")
 EVIDENCE_FILE = Path(
     os.getenv(
         "EVIDENCE_FILE",
@@ -36,18 +51,25 @@ EVIDENCE_FILE = Path(
 )
 
 
-def mask_token(token: str, head: int = 24, tail: int = 16) -> str:
-    if len(token) <= head + tail:
-        return token
-    return f"{token[:head]}...{token[-tail:]}"
-
-
 def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
 
 def sha256_b64url(text: str) -> str:
     return b64url(hashlib.sha256(text.encode("utf-8")).digest())
+
+
+def mask_token(token: str, head: int = 28, tail: int = 18) -> str:
+    if len(token) <= head + tail:
+        return token
+    return f"{token[:head]}...{token[-tail:]}"
+
+
+def generate_pkce_pair() -> tuple[str, str]:
+    verifier = b64url(secrets.token_bytes(64))
+    challenge = sha256_b64url(verifier)
+    return verifier, challenge
+
 
 def parse_code_from_input(raw: str) -> str:
     raw = raw.strip()
@@ -60,10 +82,43 @@ def parse_code_from_input(raw: str) -> str:
     return raw
 
 
-def generate_pkce_pair() -> tuple[str, str]:
-    verifier = b64url(secrets.token_bytes(64))
-    challenge = sha256_b64url(verifier)
-    return verifier, challenge
+def public_jwk(private_key: ec.EllipticCurvePrivateKey) -> dict:
+    pub = private_key.public_key().public_numbers()
+    return {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": b64url(pub.x.to_bytes(32, "big")),
+        "y": b64url(pub.y.to_bytes(32, "big")),
+    }
+
+
+def create_dpop_proof(
+    private_key: ec.EllipticCurvePrivateKey,
+    htm: str,
+    htu: str,
+    access_token: str | None = None,
+) -> str:
+    payload = {
+        "jti": str(uuid.uuid4()),
+        "htm": htm.upper(),
+        "htu": htu,
+        "iat": int(time.time()),
+    }
+    if access_token:
+        payload["ath"] = sha256_b64url(access_token)
+
+    header = {
+        "typ": "dpop+jwt",
+        "alg": "ES256",
+        "jwk": public_jwk(private_key),
+    }
+    encoded_header = b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+    encoded_payload = b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
+    der_signature = private_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
+    r, s = decode_dss_signature(der_signature)
+    raw_signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+    return f"{encoded_header}.{encoded_payload}.{b64url(raw_signature)}"
 
 
 def save_evidence(report: str) -> None:
@@ -72,75 +127,7 @@ def save_evidence(report: str) -> None:
     print(f"[+] Evidence saved: {EVIDENCE_FILE}")
 
 
-def ec_public_jwk(private_key: ec.EllipticCurvePrivateKey) -> dict:
-    pub = private_key.public_key().public_numbers()
-    x = pub.x.to_bytes(32, "big")
-    y = pub.y.to_bytes(32, "big")
-    return {
-        "kty": "EC",
-        "crv": "P-256",
-        "x": b64url(x),
-        "y": b64url(y),
-    }
-
-
-def create_dpop_proof(
-    private_key: ec.EllipticCurvePrivateKey,
-    htm: str,
-    htu: str,
-    ath: str | None = None,
-) -> str:
-    jwk = ec_public_jwk(private_key)
-    payload = {
-        "jti": str(uuid.uuid4()),
-        "htm": htm.upper(),
-        "htu": htu,
-        "iat": int(time.time()),
-    }
-    if ath:
-        payload["ath"] = ath
-
-    headers = {
-        "typ": "dpop+jwt",
-        "alg": "ES256",
-        "jwk": jwk,
-    }
-    return jwt.encode(payload, private_key, algorithm="ES256", headers=headers)
-
-
-def get_dpop_bound_access_token(private_key: ec.EllipticCurvePrivateKey) -> str:
-    if AUTH_FLOW == "password":
-        return get_token_password_grant(private_key)
-    return get_token_authorization_code_grant(private_key)
-
-
-def get_token_password_grant(private_key: ec.EllipticCurvePrivateKey) -> str:
-    token_dpop_proof = create_dpop_proof(
-        private_key=private_key,
-        htm="POST",
-        htu=KEYCLOAK_TOKEN_URL,
-    )
-
-    response = requests.post(
-        KEYCLOAK_TOKEN_URL,
-        data={
-            "client_id": CLIENT_ID,
-            "grant_type": "password",
-            "username": ATTACK_USERNAME,
-            "password": ATTACK_PASSWORD,
-        },
-        headers={"DPoP": token_dpop_proof},
-        timeout=15,
-    )
-    response.raise_for_status()
-    body = response.json()
-    access_token = body.get("access_token")
-    if not access_token:
-        raise RuntimeError("No access_token returned from Keycloak")
-    return access_token
-
-
-def get_token_authorization_code_grant(private_key: ec.EllipticCurvePrivateKey) -> str:
+def get_token_authorization_code(private_key: ec.EllipticCurvePrivateKey) -> str:
     verifier, challenge = generate_pkce_pair()
     state = b64url(secrets.token_bytes(16))
     auth_url = (
@@ -154,23 +141,19 @@ def get_token_authorization_code_grant(private_key: ec.EllipticCurvePrivateKey) 
         f"&code_challenge_method=S256"
     )
 
-    print("Mở URL sau trên trình duyệt và đăng nhập:")
-    print(auth_url)
-    print(f"Redirect URI dự kiến bắt đầu bằng: {REDIRECT_URI}")
-
+    print("[Step 2] Mở URL sau trên trình duyệt và đăng nhập")
+    print(f"  Auth URL: {auth_url}")
+    print(f"  Redirect URI kỳ vọng: {REDIRECT_URI}")
     auth_code = parse_code_from_input(AUTH_CODE)
     if not auth_code:
-        user_input = input("Dán toàn bộ callback URL hoặc chỉ authorization code: ").strip()
+        user_input = input("  Dán toàn bộ callback URL hoặc chỉ authorization code: ").strip()
         auth_code = parse_code_from_input(user_input)
     if not auth_code:
-        raise RuntimeError("Thiếu authorization code cho authorization_code flow")
+        raise RuntimeError("Thiếu authorization code")
 
-    token_dpop_proof = create_dpop_proof(
-        private_key=private_key,
-        htm="POST",
-        htu=KEYCLOAK_TOKEN_URL,
-    )
-
+    print()
+    print("[Step 3] Đổi authorization code + PKCE verifier lấy access token")
+    token_dpop = create_dpop_proof(private_key, "POST", KEYCLOAK_TOKEN_URL)
     response = requests.post(
         KEYCLOAK_TOKEN_URL,
         data={
@@ -180,118 +163,142 @@ def get_token_authorization_code_grant(private_key: ec.EllipticCurvePrivateKey) 
             "redirect_uri": REDIRECT_URI,
             "code_verifier": verifier,
         },
-        headers={"DPoP": token_dpop_proof},
+        headers={"DPoP": token_dpop},
         timeout=20,
     )
+    print(f"  HTTP status: {response.status_code}")
     response.raise_for_status()
-    body = response.json()
-    access_token = body.get("access_token")
+    access_token = response.json().get("access_token")
     if not access_token:
-        raise RuntimeError("Keycloak không trả về access_token")
+        raise RuntimeError("Keycloak không trả access_token")
+    return access_token
+
+
+def get_token_password(private_key: ec.EllipticCurvePrivateKey) -> str:
+    print("[Step 2] Lấy token bằng password grant demo")
+    print("  Lưu ý: flow này chỉ để debug; token có thể không DPoP-bound tùy Keycloak.")
+    token_dpop = create_dpop_proof(private_key, "POST", KEYCLOAK_TOKEN_URL)
+    response = requests.post(
+        KEYCLOAK_TOKEN_URL,
+        data={
+            "client_id": CLIENT_ID,
+            "grant_type": "password",
+            "username": ATTACK_USERNAME,
+            "password": ATTACK_PASSWORD,
+            "scope": "openid profile email roles",
+        },
+        headers={"DPoP": token_dpop},
+        timeout=20,
+    )
+    print(f"  HTTP status: {response.status_code}")
+    response.raise_for_status()
+    access_token = response.json().get("access_token")
+    if not access_token:
+        raise RuntimeError("Keycloak không trả access_token")
     return access_token
 
 
 def main() -> None:
-    requests.packages.urllib3.disable_warnings()  # type: ignore[attr-defined]
+    print("\n=== DPoP REPLAY ATTACK TEST ===")
+    print("Mục tiêu: chứng minh backend chặn việc dùng lại cùng một DPoP proof.")
+    print("Cơ chế bảo vệ: backend/app/security/dpop_verifier.py lưu jti vào Redis với nx=True.")
+    print(f"API target : {API_URL}")
+    print(f"TLS CA     : {TLS_CA_CERT}")
+    print(f"mTLS cert  : {CLIENT_CERT}")
+    print(f"Auth flow  : {AUTH_FLOW}")
+    print()
 
+    print("[Step 1] Tạo DPoP key pair ECDSA P-256")
     private_key = ec.generate_private_key(ec.SECP256R1())
-    print("Bước 1: Lấy access token DPoP-bound từ Keycloak")
-    print(f"Flow đang dùng: {AUTH_FLOW}")
-    print(f"POST {KEYCLOAK_TOKEN_URL}")
-    if AUTH_FLOW == "password":
-        print(f"Form: client_id={CLIENT_ID}, grant_type=password, username={ATTACK_USERNAME}, password=***")
-    else:
-        print(
-            f"Form: client_id={CLIENT_ID}, grant_type=authorization_code, "
-            f"redirect_uri={REDIRECT_URI}, code=<lấy từ browser>, code_verifier=<pkce>"
-        )
+    print(f"  Public JWK: {public_jwk(private_key)}")
 
     try:
-        access_token = get_dpop_bound_access_token(private_key)
-        print("Lấy token thành công.")
-        print(f"access_token: {mask_token(access_token)}")
-    except Exception as e:
-        print(f"[!] Keycloak auth error: {e}")
+        if AUTH_FLOW == "password":
+            access_token = get_token_password(private_key)
+        else:
+            access_token = get_token_authorization_code(private_key)
+    except Exception as exc:
+        print(f"  Keycloak auth error: {exc}")
+        print("  Result: FAIL")
         return
 
-    print("\nBước 2: Tạo DPoP proof cho request API")
-    print(f"API đích (htu): {API_URL}")
-    print("HTTP method (htm): GET")
-    api_dpop_proof = create_dpop_proof(
-        private_key=private_key,
-        htm="GET",
-        htu=API_URL,
-        ath=sha256_b64url(access_token),
-    )
-    print(f"dpop_proof: {mask_token(api_dpop_proof)}")
+    print("  Lấy access token thành công.")
+    print(f"  access_token: {mask_token(access_token)}")
+
+    print()
+    print("[Step 4] Tạo DPoP proof cho request API lần 1")
+    api_dpop_proof = create_dpop_proof(private_key, "GET", API_URL, access_token)
+    print(f"  htm: GET")
+    print(f"  htu: {API_URL}")
+    print(f"  DPoP proof: {mask_token(api_dpop_proof)}")
 
     headers = {
         "Authorization": f"Bearer {access_token}",
         "DPoP": api_dpop_proof,
     }
 
-    print("\nBước 3: Gửi request API lần 1 (kỳ vọng: 200 nếu role được phép)")
-    print(f"GET {API_URL}")
-    print(f"Headers.Authorization: Bearer {mask_token(access_token)}")
-    print(f"Headers.DPoP: {mask_token(api_dpop_proof)}")
+    print()
+    print("[Step 5] Gửi request API lần 1")
+    print("  Kỳ vọng: HTTP 200 nếu token/role/DPoP hợp lệ")
+    first = requests.get(
+        API_URL,
+        headers=headers,
+        timeout=20,
+        verify=TLS_CA_CERT,
+        cert=(CLIENT_CERT, CLIENT_KEY),
+    )
+    print(f"  Response status: {first.status_code}")
+    print(f"  Response body  : {first.text.strip()}")
 
-    first = requests.get(API_URL, headers=headers, timeout=15, verify=VERIFY_TLS)
-    print(f"Response status: {first.status_code}")
-    print(f"Response body: {first.text}")
+    print()
+    print("[Step 6] Replay lại y nguyên Authorization + DPoP proof")
+    print("  Kỳ vọng: HTTP 401 hoặc 400 vì jti đã được dùng")
+    second = requests.get(
+        API_URL,
+        headers=headers,
+        timeout=20,
+        verify=TLS_CA_CERT,
+        cert=(CLIENT_CERT, CLIENT_KEY),
+    )
+    print(f"  Response status: {second.status_code}")
+    print(f"  Response body  : {second.text.strip()}")
 
-    print("\nBước 4: Replay lại cùng DPoP proof (kỳ vọng: 401)")
-    print(f"GET {API_URL}")
-    print("Tái sử dụng y nguyên Authorization + DPoP headers của Bước 3")
-    second = requests.get(API_URL, headers=headers, timeout=15, verify=VERIFY_TLS)
-    print(f"Response status: {second.status_code}")
-    print(f"Response body: {second.text}")
-
-    print("\n~ TỔNG KẾT KẾT QUẢ ~")
-    print(f"Status lần 1: {first.status_code}")
-    print(f"Status lần 2: {second.status_code}")
-
-    if first.status_code == 403 and second.status_code == 403:
-        verdict = "INVALID_TEST_POLICY_BLOCK"
-        verdict_detail = (
-            "Request bị chặn bởi policy/role trước khi đến replay check. "
-            "Cần đổi user hoặc endpoint được allow để test replay đúng."
-        )
-    elif (
-        first.status_code == 401
-        and "Token is not DPoP bound" in first.text
-        and second.status_code == 401
-    ):
-        verdict = "INVALID_TEST_TOKEN_NOT_BOUND"
-        verdict_detail = (
-            "Access token chưa được bind DPoP (thiếu cnf.jkt), "
-            "nên không thể kết luận replay trên token-bound flow."
-        )
-    elif first.status_code == 200 and second.status_code in [401, 400]:
+    if first.status_code == 200 and second.status_code in {400, 401}:
         verdict = "PASS"
-        verdict_detail = "Replay bị chặn đúng (jti đã được sử dụng)."
+        detail = "Replay bị chặn đúng vì DPoP jti đã được sử dụng."
     elif first.status_code == 200 and second.status_code == 200:
         verdict = "FAIL_REPLAY_ACCEPTED"
-        verdict_detail = "Replay không bị chặn."
+        detail = "Replay không bị chặn, cần kiểm tra Redis jti store."
+    elif first.status_code == 401 and "Token is not DPoP bound" in first.text:
+        verdict = "INVALID_TEST_TOKEN_NOT_BOUND"
+        detail = "Token không có cnf.jkt; hãy dùng authorization_code flow thay vì password flow."
+    elif first.status_code == 403:
+        verdict = "INVALID_TEST_POLICY_BLOCK"
+        detail = "Request bị policy/role chặn trước khi tới replay check; hãy đổi user hoặc endpoint."
     else:
         verdict = "FAIL_UNEXPECTED"
-        verdict_detail = "Kết quả không đúng mẫu mong đợi, cần kiểm tra middleware/log."
+        detail = "Kết quả không đúng mẫu mong đợi, cần kiểm tra middleware/log."
 
-    print(f"=> Kết luận: {verdict}")
-    print(f"=> Chi tiết: {verdict_detail}")
+    print()
+    print("[Step 7] Kết luận")
+    print(f"  Result : {verdict}")
+    print(f"  Ý nghĩa: {detail}")
 
     timestamp = datetime.now(timezone.utc).isoformat()
     result_lines = [
-        "~ BẰNG CHỨNG DPOP REPLAY ATTACK ~",
+        "~ DPOP REPLAY ATTACK EVIDENCE ~",
         f"timestamp_utc: {timestamp}",
         f"target_url: {API_URL}",
+        f"auth_flow: {AUTH_FLOW}",
+        f"tls_ca: {TLS_CA_CERT}",
+        f"client_cert: {CLIENT_CERT}",
         f"first_status: {first.status_code}",
         f"second_status: {second.status_code}",
-        f"verify_tls: {VERIFY_TLS}",
         f"first_body: {first.text.strip()}",
         f"second_body: {second.text.strip()}",
-        "kỳ_vọng: lần1 = 200, lần2 = 401 (hoặc 400)",
+        "expected: first request = 200, replay request = 401 or 400",
         f"result: {verdict}",
-        f"detail: {verdict_detail}",
+        f"detail: {detail}",
     ]
     save_evidence("\n".join(result_lines) + "\n")
 

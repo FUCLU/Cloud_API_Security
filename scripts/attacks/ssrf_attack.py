@@ -4,6 +4,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
@@ -35,6 +40,12 @@ def run_case(name: str, url: str, expected_allowed: bool) -> dict:
 
 
 def main() -> None:
+    print("\n=== SSRF ATTACK TEST ===")
+    print("Mục tiêu: chứng minh server không chấp nhận URL nội bộ/metadata/scheme nguy hiểm.")
+    print("Cơ chế bảo vệ: backend/app/security/ssrf_guard.py validate scheme, hostname và IP sau DNS resolve.")
+    print()
+
+    print("[Step 1] Chuẩn bị URL tấn công và URL hợp lệ")
     cases = [
         run_case("block_aws_metadata_ip", "http://169.254.169.254/latest/meta-data/", False),
         run_case("block_loopback_ip", "http://127.0.0.1:8000/admin", False),
@@ -46,6 +57,21 @@ def main() -> None:
 
     passed = sum(1 for case in cases if case["passed"])
     result = "PASS" if passed == len(cases) else "FAIL"
+
+    print("[Step 2] Chạy từng case")
+    for index, case in enumerate(cases, start=1):
+        status = "PASS" if case["passed"] else "FAIL"
+        print(f"  [{index}] {status} - {case['name']}")
+        print(f"      url      : {case['url']}")
+        print(f"      expected : allowed={case['expected_allowed']}")
+        print(f"      actual   : allowed={case['actual_allowed']}")
+        print(f"      reason   : {case['reason']}")
+
+    print()
+    print("[Step 3] Kết luận")
+    print(f"  Passed cases: {passed}/{len(cases)}")
+    print(f"  Result      : {result}")
+
     report = {
         "title": "SSRF outbound URL guard evidence",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),

@@ -1,6 +1,6 @@
 {
   "title": "Frontend role route isolation / privilege escalation evidence",
-  "timestamp_utc": "2026-06-01T05:39:24.454314+00:00",
+  "timestamp_utc": "2026-06-02T04:40:19.075317+00:00",
   "expected_security_property": "Admin, staff and customer UI areas are isolated by route role guards.",
   "result": "PASS",
   "passed_cases": 9,

@@ -28,7 +28,8 @@ class Product(Base):
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer)
+    # Keycloak subject (`sub`) of the customer who owns this order.
+    user_id = Column(String)
     product_id = Column(Integer, nullable=True)
     status = Column(String, default="pending")
     total = Column(Float)

@@ -8,7 +8,7 @@ import hmac
 from hashlib import sha256
 import os
 
-from app.security.bola_guard import can_read_order
+from app.security.bola_guard import can_read_order, roles_from_payload
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -29,8 +29,19 @@ class OrderCreate(BaseModel):
 
 
 @router.get("", response_model=List[OrderResponse])
-def get_orders(db: Session = Depends(get_db)):
-    return db.query(Order).all()
+def get_orders(request: Request, db: Session = Depends(get_db)):
+    token_payload = getattr(request.state, "user", None)
+    if not token_payload:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    roles = roles_from_payload(token_payload)
+    if "admin" in roles or "staff" in roles:
+        return db.query(Order).all()
+
+    token_sub = token_payload.get("sub")
+    if not token_sub:
+        raise HTTPException(status_code=403, detail="Missing subject")
+    return db.query(Order).filter(Order.user_id == str(token_sub)).all()
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
@@ -53,8 +64,17 @@ def get_order(order_id: int, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+def create_order(order: OrderCreate, request: Request, db: Session = Depends(get_db)):
+    token_payload = getattr(request.state, "user", None)
+    if not token_payload:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    token_sub = token_payload.get("sub")
+    if not token_sub:
+        raise HTTPException(status_code=403, detail="Missing subject")
+
     order_data = order.model_dump() if hasattr(order, "model_dump") else order.dict()
+    order_data["user_id"] = str(token_sub)
     db_order = Order(**order_data)
     db.add(db_order)
     db.commit()

@@ -4,6 +4,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "backend" / "app"))
@@ -37,6 +42,18 @@ def run_case(name: str, order_owner_id, token_payload: dict, expected: bool) -> 
 
 
 def main() -> None:
+    print("\n=== BOLA / IDOR ATTACK TEST ===")
+    print("Mục tiêu: chứng minh customer không đọc được order của customer khác.")
+    print("Cơ chế bảo vệ: backend/app/security/bola_guard.py kiểm tra owner của object.")
+    print()
+
+    print("[Step 1] Chuẩn bị các payload token giả lập")
+    print("  - customer-a: chủ sở hữu order")
+    print("  - attacker-customer: customer khác cố đọc order của victim")
+    print("  - staff/admin: role vận hành được phép xem order")
+    print()
+
+    print("[Step 2] Chạy 5 test case owner/role")
     cases = [
         run_case(
             "customer_reads_own_order",
@@ -72,6 +89,21 @@ def main() -> None:
 
     passed = sum(1 for case in cases if case["passed"])
     result = "PASS" if passed == len(cases) else "FAIL"
+
+    for index, case in enumerate(cases, start=1):
+        status = "PASS" if case["passed"] else "FAIL"
+        print(f"  [{index}] {status} - {case['name']}")
+        print(f"      order_owner_id : {case['order_owner_id']}")
+        print(f"      token_sub      : {case['token_sub']}")
+        print(f"      roles          : {case['roles']}")
+        print(f"      expected       : {case['expected_allowed']}")
+        print(f"      actual         : {case['actual_allowed']}")
+
+    print()
+    print("[Step 3] Kết luận")
+    print(f"  Passed cases: {passed}/{len(cases)}")
+    print(f"  Result      : {result}")
+
     report = {
         "title": "BOLA/IDOR object-level authorization evidence",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),

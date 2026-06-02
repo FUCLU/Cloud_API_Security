@@ -1,0 +1,36 @@
+{
+  "token_url": "http://localhost:8082/realms/cloudapi/protocol/openid-connect/token",
+  "client_id": "spa-client",
+  "username": "an@gmail.com",
+  "api_url": "https://localhost:8443/api/v1/products",
+  "access_token": "eyJhbGciOiJFUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJFTy1KY2NLcWVGUUZab1otcTVMS3JDZTJqUW5QS3BNM1lha2VoMWEwSXZrIn0.eyJleHAiOjE3ODAzNzUwNzAsImlhdCI6MTc4MDM3NDc3MCwianRpIjoiYmUyOTE0MGUtN2VkMS00NjZmLTk2NDItY2Y1NDEyNjdiMWMwIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9jbG91ZGFwaSIsInN1YiI6IjFkODU0N2MxLWUzMzMtNDk4Yi05MmI4LTI3NTE1YWY2ZDg3MSIsInR5cCI6IkJlYXJlciIsImF6cCI6InNwYS1jbGllbnQiLCJzZXNzaW9uX3N0YXRlIjoiMmEyMThiNTMtMGMwOS00ODNhLWIyYTItM2RlOTQ5NGVkMDIxIiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyJodHRwczovL2xvY2FsaG9zdDo1MTc0IiwiaHR0cDovL2xvY2FsaG9zdDo1MTczIiwiaHR0cDovL2xvY2FsaG9zdDo1MTc0Il0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJjdXN0b21lciJdfSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsInNpZCI6IjJhMjE4YjUzLTBjMDktNDgzYS1iMmEyLTNkZTk0OTRlZDAyMSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYW5AZ21haWwuY29tIiwiZW1haWwiOiJhbkBnbWFpbC5jb20ifQ.mdviPROf8nEUJkyTtSDH2rIbWSU9PYBtXi-dxsPkcgv5R8qo9XI_Z6R6CVKgBI4Dp61yvpL5n5gqjzkUhiaWlw",
+  "refresh_token": "eyJhbGciOiJIUzUxMiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJlNDFlY2I4Ny03MjI1LTRlOGEtYTYwOC1hYmFhOTBiMmExMjQifQ.eyJleHAiOjE3ODAzNzY1NzAsImlhdCI6MTc4MDM3NDc3MCwianRpIjoiY2FhZWUwOWYtNGM0NC00YjRhLTljNDItN2VkNzVhYTYxNjAxIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9jbG91ZGFwaSIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA4Mi9yZWFsbXMvY2xvdWRhcGkiLCJzdWIiOiIxZDg1NDdjMS1lMzMzLTQ5OGItOTJiOC0yNzUxNWFmNmQ4NzEiLCJ0eXAiOiJSZWZyZXNoIiwiYXpwIjoic3BhLWNsaWVudCIsInNlc3Npb25fc3RhdGUiOiIyYTIxOGI1My0wYzA5LTQ4M2EtYjJhMi0zZGU5NDk0ZWQwMjEiLCJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwic2lkIjoiMmEyMThiNTMtMGMwOS00ODNhLWIyYTItM2RlOTQ5NGVkMDIxIn0.TYuLGofFTyfCNFpLkEdqBw0Uci2yWySlkHZQeFgstzq1OgDVFuDx8WloRjxm1vXmBPcX9zBCa2kSW4AYQEiDhQ",
+  "id_token": "eyJhbGciOiJFUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJFTy1KY2NLcWVGUUZab1otcTVMS3JDZTJqUW5QS3BNM1lha2VoMWEwSXZrIn0.eyJleHAiOjE3ODAzNzUwNzAsImlhdCI6MTc4MDM3NDc3MCwiYXV0aF90aW1lIjowLCJqdGkiOiJiNGFjOGZjMi04MTgwLTRhMDQtYmUzZC1lYTQ5YzliZDFiYmEiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODIvcmVhbG1zL2Nsb3VkYXBpIiwiYXVkIjoic3BhLWNsaWVudCIsInN1YiI6IjFkODU0N2MxLWUzMzMtNDk4Yi05MmI4LTI3NTE1YWY2ZDg3MSIsInR5cCI6IklEIiwiYXpwIjoic3BhLWNsaWVudCIsInNlc3Npb25fc3RhdGUiOiIyYTIxOGI1My0wYzA5LTQ4M2EtYjJhMi0zZGU5NDk0ZWQwMjEiLCJhdF9oYXNoIjoiU3VfRVROdUJVTFBuY2ZCT0V0UDdxdyIsImFjciI6IjEiLCJzaWQiOiIyYTIxOGI1My0wYzA5LTQ4M2EtYjJhMi0zZGU5NDk0ZWQwMjEiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInByZWZlcnJlZF91c2VybmFtZSI6ImFuQGdtYWlsLmNvbSIsImVtYWlsIjoiYW5AZ21haWwuY29tIn0.whxIrl-eCkOHAhQYfhPyWJ7PROVtn6qKWKBbo9CkO42uf8ftJ2yQNOcRqm0ZoTbTGXsatx2ej1qcyIeApGscVg",
+  "dpop_proof_for_api": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiQjZDWkp4WmwzMGhqMUZZQ3JoeFNfeFJqTjZnTF9MOE1Pd0dkRFJicmxsRSIsInkiOiJPQmhrNXAybldKem95NFJNUjhPQjF0c1YtTHZDaDJPbkF2RVZnZzdqenJ3In19.eyJqdGkiOiIzODE0YzYzMC1jNzdiLTRkMWMtYTlkNi1kYWQ1M2ZhMjBlODMiLCJodG0iOiJHRVQiLCJodHUiOiJodHRwczovL2xvY2FsaG9zdDo4NDQzL2FwaS92MS9wcm9kdWN0cyIsImlhdCI6MTc4MDM3NDc3MSwiYXRoIjoiU3VfRVROdUJVTFBuY2ZCT0V0UDdxOFAxUU54Z2FaVXRIYmptbll5XzVwbyJ9.UXFtCQM5wPi_O30OzTenlXFVe19pHRloypGBaWmEPRKRcoR3VQEhoLMMDsqtGQzSfL67r9VZ0xgWibkM_Zg7dA",
+  "access_payload": {
+    "exp": 1780375070,
+    "iat": 1780374770,
+    "jti": "be29140e-7ed1-466f-9642-cf541267b1c0",
+    "iss": "http://localhost:8082/realms/cloudapi",
+    "sub": "1d8547c1-e333-498b-92b8-27515af6d871",
+    "typ": "Bearer",
+    "azp": "spa-client",
+    "session_state": "2a218b53-0c09-483a-b2a2-3de9494ed021",
+    "acr": "1",
+    "allowed-origins": [
+      "https://localhost:5174",
+      "http://localhost:5173",
+      "http://localhost:5174"
+    ],
+    "realm_access": {
+      "roles": [
+        "customer"
+      ]
+    },
+    "scope": "openid profile email",
+    "sid": "2a218b53-0c09-483a-b2a2-3de9494ed021",
+    "email_verified": false,
+    "preferred_username": "an@gmail.com",
+    "email": "an@gmail.com"
+  }
+}

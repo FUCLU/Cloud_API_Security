@@ -1,6 +1,6 @@
 {
   "title": "BOLA/IDOR object-level authorization evidence",
-  "timestamp_utc": "2026-06-01T04:10:52.895159+00:00",
+  "timestamp_utc": "2026-06-02T04:40:17.574669+00:00",
   "expected_security_property": "A customer cannot read another customer's order; staff/admin can operate orders.",
   "result": "PASS",
   "passed_cases": 5,

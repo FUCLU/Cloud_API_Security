@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker, Session
 from .models import Base
 import os
@@ -27,6 +28,15 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Keep the dev database compatible with the current BOLA model.
+    # Existing demo rows with integer owners become text; new rows use Keycloak `sub`.
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE orders "
+                "ALTER COLUMN user_id TYPE VARCHAR USING user_id::text"
+            )
+        )
 
 
 if __name__ == "__main__":

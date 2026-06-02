@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 EVIDENCE_FILE = Path("EVIDENCE/attack_results/role-escalation/role_escalation_result.json")
 APP_FILE = Path("frontend/src/App.jsx")
@@ -34,6 +39,12 @@ def route_contains(app_source: str, path: str, expected_roles: list[str]) -> boo
 
 
 def main() -> int:
+    print("\n=== ROLE ESCALATION TEST ===")
+    print("Mục tiêu: chứng minh admin/staff/customer chỉ vào được đúng vùng UI được phép.")
+    print("Cơ chế bảo vệ: frontend/src/App.jsx + PrivateRoute + roleAccess.js.")
+    print()
+
+    print("[Step 1] Đọc cấu hình route thật từ frontend/src/App.jsx")
     app_source = APP_FILE.read_text(encoding="utf-8")
 
     cases = [
@@ -114,16 +125,20 @@ def main() -> int:
         },
     ]
 
+    print("[Step 2] Kiểm tra route nào yêu cầu role nào")
+    for case in route_config_cases:
+        status = "PASS" if case["passed"] else "FAIL"
+        print(f"  {status} - {case['path']} chỉ cho {case['expectedRoles']}")
+
     evaluated = []
+    print()
+    print("[Step 3] Kiểm tra 9 tình huống leo quyền giữa các role")
     for test_case in cases:
         actual = can_access_route(test_case["userRoles"], test_case["allowedRoles"])
-        evaluated.append(
-            {
-                **test_case,
-                "actual": actual,
-                "passed": actual == test_case["expected"],
-            }
-        )
+        passed = actual == test_case["expected"]
+        evaluated.append({**test_case, "actual": actual, "passed": passed})
+        status = "PASS" if passed else "FAIL"
+        print(f"  {status} - {test_case['name']}: expected={test_case['expected']}, actual={actual}")
 
     passed_cases = sum(1 for test_case in evaluated if test_case["passed"])
     passed_route_cases = sum(1 for test_case in route_config_cases if test_case["passed"])
@@ -147,6 +162,12 @@ def main() -> int:
         "route_config_cases": route_config_cases,
         "cases": evaluated,
     }
+
+    print()
+    print("[Step 4] Kết luận")
+    print(f"  Logic cases : {passed_cases}/{len(evaluated)} passed")
+    print(f"  Route config: {passed_route_cases}/{len(route_config_cases)} passed")
+    print(f"  Result      : {report['result']}")
 
     EVIDENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
     EVIDENCE_FILE.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")

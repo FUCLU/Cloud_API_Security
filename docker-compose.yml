@@ -177,8 +177,15 @@ services:
       KONG_SSL_CERT: /certs/kong.crt
       KONG_SSL_CERT_KEY: /certs/kong.key
       KONG_SSL_PROTOCOLS: "TLSv1.3"
+      # Chỉ mở HTTPS proxy; không expose HTTP plaintext qua Kong.
+      KONG_PROXY_LISTEN: "0.0.0.0:8443 ssl http2"
+      # Ép TLS 1.3 và yêu cầu client certificate ở proxy listener.
+      # Client cert phải được ký bởi CA nội bộ trong certs/ca.crt.
+      KONG_NGINX_PROXY_SSL_PROTOCOLS: "TLSv1.3"
+      KONG_NGINX_PROXY_SSL_CLIENT_CERTIFICATE: /certs/ca.crt
+      KONG_NGINX_PROXY_SSL_VERIFY_CLIENT: "on"
+      KONG_NGINX_PROXY_SSL_VERIFY_DEPTH: "2"
     ports:
-      - "8000:8000"   # HTTP proxy
       - "8443:8443"   # HTTPS proxy
       - "8001:8001"   # Admin API (dev only — đừng expose production)
     volumes:

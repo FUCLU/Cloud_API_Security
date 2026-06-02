@@ -14,8 +14,8 @@
 </head>
 <body>
   <h1>D1 DAST Evidence</h1>
-  <p>Generated at 2026-06-01T08:58:49.617450+00:00</p>
-  <p>This report contains built-in black-box checks. ZAP status: <strong>skipped</strong> - ghcr.io/zaproxy/zaproxy:stable is not available locally; pull it and rerun to execute ZAP baseline.</p>
+  <p>Generated at 2026-06-02T03:50:15.913889+00:00</p>
+  <p>This report contains built-in black-box checks. ZAP status: <strong>skipped</strong> - --skip-zap was set</p>
   <table>
     <thead><tr><th>Check</th><th>Status</th><th>Expected</th><th>Target</th></tr></thead>
     <tbody><tr><td>frontend_https_available</td><td style='color:#137333;font-weight:700'>PASS</td><td>HTTP 200 over trusted local TLS</td><td><code>https://localhost:5174</code></td></tr><tr><td colspan='4'><pre>{
@@ -23,16 +23,34 @@
   "status": 200,
   "headers": {
     "server": "nginx/1.29.8",
-    "date": "Mon, 01 Jun 2026 08:58:41 GMT",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "content-type": "text/html",
     "content-length": "403",
-    "last-modified": "Mon, 01 Jun 2026 08:29:14 GMT",
+    "last-modified": "Mon, 01 Jun 2026 09:44:11 GMT",
     "connection": "close",
-    "etag": "\"6a1d42da-193\"",
+    "etag": "\"6a1d546b-193\"",
     "cache-control": "no-cache, no-store, must-revalidate",
     "accept-ranges": "bytes"
   },
-  "body": "<!DOCTYPE html>\r\n<html lang=\"vi\">\r\n  <head>\r\n    <meta charset=\"UTF-8\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title>E-Market</title>\r\n    <script type=\"module\" crossorigin src=\"/assets/index-CI9kV7s-.js\"></script>\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-De7siZd6.css\">\n  </head>\r\n  <body>\r\n    <div id=\"root\"></div>\r\r\n  </body>\r\n</html>"
+  "body": "<!DOCTYPE html>\r\n<html lang=\"vi\">\r\n  <head>\r\n    <meta charset=\"UTF-8\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title>E-Market</title>\r\n    <script type=\"module\" crossorigin src=\"/assets/index-p9t8O8Pt.js\"></script>\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-B0U8lMLN.css\">\n  </head>\r\n  <body>\r\n    <div id=\"root\"></div>\r\r\n  </body>\r\n</html>"
+}</pre></td></tr><tr><td>kong_requires_client_certificate</td><td style='color:#137333;font-weight:700'>PASS</td><td>Kong mTLS rejects requests that do not present a trusted client certificate</td><td><code>https://localhost:8443/health</code></td></tr><tr><td colspan='4'><pre>{
+  "ok": false,
+  "status": 400,
+  "headers": {
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
+    "content-type": "text/html; charset=UTF-8",
+    "content-length": "202",
+    "connection": "close",
+    "vary": "Origin",
+    "access-control-allow-credentials": "true",
+    "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-kong-response-latency": "0",
+    "server": "kong/3.6.1",
+    "x-kong-request-id": "e4635c349f805a343215e13be83c5307"
+  },
+  "body": "<html>\r\n<head><title>400 No required SSL certificate was sent</title></head>\r\n<body>\r\n<center><h1>400 Bad Request</h1></center>\r\n<center>No required SSL certificate was sent</center>\r\n</body>\r\n</html>\r\n"
 }</pre></td></tr><tr><td>kong_https_health</td><td style='color:#137333;font-weight:700'>PASS</td><td>HTTP 200 and backend status ok through Kong HTTPS</td><td><code>https://localhost:8443/health</code></td></tr><tr><td colspan='4'><pre>{
   "ok": true,
   "status": 200,
@@ -40,22 +58,22 @@
     "content-type": "application/json",
     "content-length": "15",
     "connection": "close",
-    "ratelimit-reset": "19",
     "x-ratelimit-remaining-minute": "99",
     "x-ratelimit-limit-minute": "100",
     "ratelimit-remaining": "99",
     "ratelimit-limit": "100",
-    "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+    "ratelimit-reset": "44",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "server": "uvicorn",
     "vary": "Origin",
     "access-control-allow-credentials": "true",
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
-    "x-kong-upstream-latency": "4",
-    "x-kong-proxy-latency": "7987",
+    "x-kong-upstream-latency": "2",
+    "x-kong-proxy-latency": "5",
     "via": "kong/3.6.1",
-    "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+    "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
   },
   "body": "{\"status\":\"ok\"}"
 }</pre></td></tr><tr><td>security_headers_present</td><td style='color:#137333;font-weight:700'>PASS</td><td>HSTS, X-Content-Type-Options and X-Frame-Options are present</td><td><code>https://localhost:8443/health</code></td></tr><tr><td colspan='4'><pre>{
@@ -63,57 +81,57 @@
     "content-type": "application/json",
     "content-length": "15",
     "connection": "close",
-    "ratelimit-reset": "19",
     "x-ratelimit-remaining-minute": "99",
     "x-ratelimit-limit-minute": "100",
     "ratelimit-remaining": "99",
     "ratelimit-limit": "100",
-    "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+    "ratelimit-reset": "44",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "server": "uvicorn",
     "vary": "Origin",
     "access-control-allow-credentials": "true",
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
-    "x-kong-upstream-latency": "4",
-    "x-kong-proxy-latency": "7987",
+    "x-kong-upstream-latency": "2",
+    "x-kong-proxy-latency": "5",
     "via": "kong/3.6.1",
-    "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+    "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
   }
 }</pre></td></tr><tr><td>rate_limit_headers_present</td><td style='color:#137333;font-weight:700'>PASS</td><td>Kong rate-limit headers are present</td><td><code>https://localhost:8443/health</code></td></tr><tr><td colspan='4'><pre>{
   "headers": {
     "content-type": "application/json",
     "content-length": "15",
     "connection": "close",
-    "ratelimit-reset": "19",
     "x-ratelimit-remaining-minute": "99",
     "x-ratelimit-limit-minute": "100",
     "ratelimit-remaining": "99",
     "ratelimit-limit": "100",
-    "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+    "ratelimit-reset": "44",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "server": "uvicorn",
     "vary": "Origin",
     "access-control-allow-credentials": "true",
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
-    "x-kong-upstream-latency": "4",
-    "x-kong-proxy-latency": "7987",
+    "x-kong-upstream-latency": "2",
+    "x-kong-proxy-latency": "5",
     "via": "kong/3.6.1",
-    "x-kong-request-id": "5f7b26552950913ba611b27f871a8d1e"
+    "x-kong-request-id": "d005f736d3847117dbd4fd746365a76c"
   }
 }</pre></td></tr><tr><td>protected_endpoint_requires_auth</td><td style='color:#137333;font-weight:700'>PASS</td><td>Missing Authorization is rejected by gateway/backend with 401 or 403</td><td><code>https://localhost:8443/api/v1/users</code></td></tr><tr><td colspan='4'><pre>{
   "ok": false,
   "status": 403,
   "headers": {
-    "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "content-type": "application/json; charset=utf-8",
     "connection": "close",
-    "ratelimit-reset": "11",
     "x-ratelimit-remaining-minute": "98",
     "x-ratelimit-limit-minute": "100",
     "ratelimit-remaining": "98",
     "ratelimit-limit": "100",
+    "ratelimit-reset": "44",
     "content-length": "51",
     "vary": "Origin",
     "access-control-allow-credentials": "true",
@@ -122,14 +140,14 @@
     "x-frame-options": "DENY",
     "x-kong-response-latency": "3",
     "server": "kong/3.6.1",
-    "x-kong-request-id": "be30bc7d4cc8b9089b5257591881d251"
+    "x-kong-request-id": "eae36639ce35f22c9be0f5515b460066"
   },
-  "body": "{\"error\":\"Access Denied\",\"reason\":\"forbidden_role\"}"
+  "body": "{\"reason\":\"forbidden_role\",\"error\":\"Access Denied\"}"
 }</pre></td></tr><tr><td>jwt_alg_none_rejected</td><td style='color:#137333;font-weight:700'>PASS</td><td>Forged alg=none JWT is rejected</td><td><code>https://localhost:8443/api/v1/users</code></td></tr><tr><td colspan='4'><pre>{
   "ok": false,
   "status": 401,
   "headers": {
-    "date": "Mon, 01 Jun 2026 08:58:49 GMT",
+    "date": "Tue, 02 Jun 2026 03:50:16 GMT",
     "content-type": "application/json; charset=utf-8",
     "connection": "close",
     "content-length": "34",
@@ -138,9 +156,9 @@
     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
-    "x-kong-response-latency": "0",
+    "x-kong-response-latency": "1",
     "server": "kong/3.6.1",
-    "x-kong-request-id": "0e8c3f0d0c9afd06af59f03f1cc03831"
+    "x-kong-request-id": "dc6b0e28671be929691dbf73227d5835"
   },
   "body": "{\"message\":\"Invalid token header\"}"
 }</pre></td></tr></tbody>
@@ -148,7 +166,7 @@
   <h2>ZAP Details</h2>
   <pre>{
   "status": "skipped",
-  "reason": "ghcr.io/zaproxy/zaproxy:stable is not available locally; pull it and rerun to execute ZAP baseline."
+  "reason": "--skip-zap was set"
 }</pre>
 </body>
 </html>
