@@ -1,78 +1,84 @@
-import sys
 import os
 import ssl
+from contextlib import asynccontextmanager
+
 import uvicorn
-
-sys.path.insert(0, "/app")
-sys.path.insert(0, "/app/app")
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Chọn 1 bộ router duy nhất — api/v1 vì đã có prefix /api/v1 bên trong
 from app.api.v1 import users, orders, products, auth, security
-from app.middleware.auth_middleware import AuthMiddleware
 from app.db.database import init_db
-
-# ── Khởi tạo app DUY NHẤT ────────────────────────────────────────
-app = FastAPI(
-    title="Cloud API Security Backend",
-    version="1.0.0",
-    redirect_slashes=False,
-)
-
-# ── Middleware — thứ tự quan trọng ───────────────────────────────
-# CORS phải trước AuthMiddleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],        # production: đổi thành domain cụ thể
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(AuthMiddleware) 
-
-# ── Routers ───────────────────────────────────────────────────────
-# prefix "/api/v1" đã được định nghĩa bên trong từng file api/v1/
-app.include_router(users.router)
-app.include_router(products.router)
-app.include_router(orders.router)
-app.include_router(auth.router)
-app.include_router(security.router)
+from app.middleware.auth_middleware import AuthMiddleware
 
 
-@app.on_event("startup")
-def startup_init_db():
-    # Ensure tables exist so protected endpoints do not fail with UndefinedTable.
+APP_TITLE = "Cloud API Security Backend"
+APP_VERSION = "1.0.0"
+DEFAULT_CORS_ORIGINS = "https://localhost:5174"
+TLS_CERT_PATH = "/certs/backend.crt"
+TLS_KEY_PATH = "/certs/backend.key"
+
+
+def parse_cors_origins() -> list[str]:
+    raw_origins = os.getenv("BACKEND_CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     init_db()
+    yield
 
-# ── Health check — public, không qua AuthMiddleware ──────────────
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
-@app.get("/")
-def root():
-    return {"message": "Backend is running"}
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=APP_TITLE,
+        version=APP_VERSION,
+        redirect_slashes=False,
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=parse_cors_origins(),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "DPoP", "Content-Type"],
+    )
+    app.add_middleware(AuthMiddleware)
+
+    for router in (users.router, products.router, orders.router, auth.router, security.router):
+        app.include_router(router)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    @app.get("/")
+    def root():
+        return {"message": "Backend is running"}
+
+    return app
+
+
+def uvicorn_tls_kwargs() -> dict:
+    if not (os.path.exists(TLS_CERT_PATH) and os.path.exists(TLS_KEY_PATH)):
+        print("Backend running without local TLS certificate")
+        return {}
+
+    print("Backend TLS certificate loaded")
+    return {
+        "ssl_certfile": TLS_CERT_PATH,
+        "ssl_keyfile": TLS_KEY_PATH,
+        "ssl_version": ssl.PROTOCOL_TLS_SERVER,
+    }
+
+
+app = create_app()
 
 if __name__ == "__main__":
-    CERT = "/certs/backend.crt"
-    KEY  = "/certs/backend.key"
-
-    uvicorn_kwargs = {}
-    if os.path.exists(CERT) and os.path.exists(KEY):
-        uvicorn_kwargs = {
-            "ssl_certfile": CERT,
-            "ssl_keyfile": KEY,
-            "ssl_version": ssl.PROTOCOL_TLS_SERVER,
-        }
-        print("✅ TLS 1.3 enabled")
-    else:
-        print("⚠️ Running HTTP (debug mode)")
-
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=9000,
-        **uvicorn_kwargs,
+        **uvicorn_tls_kwargs(),
     )

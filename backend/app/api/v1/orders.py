@@ -9,6 +9,7 @@ from hashlib import sha256
 import os
 
 from app.security.bola_guard import can_read_order, roles_from_payload
+from app.security.authorization import require_roles
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -83,7 +84,8 @@ def create_order(order: OrderCreate, request: Request, db: Session = Depends(get
 
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_order(order_id: int, db: Session = Depends(get_db)):
+def delete_order(order_id: int, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, {"admin", "staff"})
     db_order = db.query(Order).filter(Order.id == order_id).first()
     if not db_order:
         raise HTTPException(status_code=404, detail="Order not found")

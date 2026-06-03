@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import User
 from pydantic import BaseModel
 from typing import List
+from app.security.authorization import require_roles
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -26,12 +27,14 @@ class UserResponse(BaseModel):
 
 
 @router.get("", response_model=List[UserResponse])
-def get_users(db: Session = Depends(get_db)):
+def get_users(request: Request, db: Session = Depends(get_db)):
+    require_roles(request, {"admin"})
     return db.query(User).all()
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+def create_user(user: UserCreate, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, {"admin"})
     # Tương thích mọi phiên bản Pydantic
     user_data = user.model_dump() if hasattr(user, "model_dump") else user.dict()
     db_user = User(**user_data)
@@ -42,7 +45,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
+def update_user(user_id: int, user: UserCreate, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, {"admin"})
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")

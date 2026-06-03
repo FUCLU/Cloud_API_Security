@@ -25,7 +25,6 @@ export function AuthProvider({ children }) {
     setRefreshToken(null)
     setIdToken(null)
     setUser(null)
-    localStorage.removeItem(AUTH_STORAGE_KEY)
     sessionStorage.removeItem(AUTH_STORAGE_KEY)
     if (timerRef.current) clearTimeout(timerRef.current)
   }, [])
@@ -35,7 +34,7 @@ export function AuthProvider({ children }) {
     setRefreshToken(tokens.refresh_token)
     setIdToken(tokens.id_token)
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       AUTH_STORAGE_KEY,
       JSON.stringify({
         accessToken: tokens.access_token,
@@ -73,7 +72,7 @@ export function AuthProvider({ children }) {
   }, [clearAuth])
 
   useEffect(() => {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY) || sessionStorage.getItem(AUTH_STORAGE_KEY)
+    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY)
 
     if (!raw || accessToken) {
       setAuthReady(true)
@@ -90,7 +89,6 @@ export function AuthProvider({ children }) {
         })
       }
     } catch {
-      localStorage.removeItem(AUTH_STORAGE_KEY)
       sessionStorage.removeItem(AUTH_STORAGE_KEY)
     } finally {
       setAuthReady(true)

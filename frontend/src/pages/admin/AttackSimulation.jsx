@@ -1,6 +1,13 @@
 import React, { useState } from 'react'
 
-const KONG_URL = 'http://localhost:8000'
+const KONG_URL = import.meta.env.VITE_KONG_URL || window.location.origin
+const KONG_HOST = (() => {
+  try {
+    return new URL(KONG_URL).host
+  } catch {
+    return window.location.host
+  }
+})()
 
 const FAKE_JWT = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InJzYS1rZXktMSJ9.eyJzdWIiOiJ1aWQtMDA0IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy9jb21wYW55IiwiYXVkIjoic3BhLWNsaWVudCIsInJvbGVzIjpbImN1c3RvbWVyIl0sImV4cCI6MTcxMTYzNTYwMCwiaWF0IjoxNzExNjM1MzAwLCJqdGkiOiJhYmMtMDA0In0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 const FAKE_DPOP = 'eyJhbGciOiJFUzI1NiIsInR5cCI6ImRwb3AranQiLCJqd2siOnsiYWxnIjoiRUMyNTYiLCJrdHkiOiJFQyIsImNydiI6IlAtMjU2In19.eyJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cDovL2xvY2FsaG9zdDo4MDAwL2FwaS92MS9vcmRlcnMiLCJpYXQiOjE3MTE2MzUzMDAsImp0aSI6Impvb3AtMDAxIn0.replay_stolen_signature_xyz'
@@ -19,7 +26,7 @@ const ATTACKS_INIT = [
     buildRequest: (f) => ({
       method: 'GET', path: f.path, body: null,
       headers: {
-        'Host': 'localhost:8000',
+        'Host': KONG_HOST,
         'Authorization': `Bearer ${FAKE_JWT}`,
         'X-Request-ID': 'req-bola-' + Math.random().toString(36).slice(2,7),
         'X-Forwarded-For': '10.0.0.14',
@@ -46,7 +53,7 @@ const ATTACKS_INIT = [
     buildRequest: (f) => ({
       method: 'POST', path: f.path, body: f.body,
       headers: {
-        'Host': 'localhost:8000',
+        'Host': KONG_HOST,
         'Authorization': `DPoP ${FAKE_JWT}`,
         'DPoP': FAKE_DPOP,
         'X-Request-ID': 'req-replay-001',
@@ -75,7 +82,7 @@ const ATTACKS_INIT = [
     buildRequest: (f) => ({
       method: 'GET', path: f.path, body: null,
       headers: {
-        'Host': 'localhost:8000',
+        'Host': KONG_HOST,
         'Authorization': `Bearer ${FAKE_ALG_NONE}`,
         'X-Request-ID': 'req-algnone-001',
         'X-Forwarded-For': '10.0.0.99',
@@ -106,7 +113,7 @@ const ATTACKS_INIT = [
     buildRequest: (f) => ({
       method: 'POST', path: f.path, body: f.body,
       headers: {
-        'Host': 'localhost:8000',
+        'Host': KONG_HOST,
         'Authorization': `Bearer ${FAKE_JWT}`,
         'X-Request-ID': 'req-ssrf-001',
         'X-Forwarded-For': '10.0.0.55',

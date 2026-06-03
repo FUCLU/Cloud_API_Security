@@ -1,0 +1,6 @@
+_format_version: "3.0"
+
+# Reference decK file. The active Kong declarative config is gateway/kong.yml.
+services: []
+routes: []
+plugins: []

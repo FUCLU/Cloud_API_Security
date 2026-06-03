@@ -3,9 +3,10 @@ _format_version: "3.0"
 services:
   - name: backend-service
     url: https://api-backend:9000
-    # D1 dùng CA self-signed; upstream vẫn được mã hóa TLS.
-    # Nếu muốn verify upstream chặt hơn, import ca.crt vào Kong và bật tls_verify.
-    tls_verify: false
+    # Backend chạy HTTPS nội bộ và Kong phải verify certificate chain.
+    # /certs/ca.crt được cấu hình trong KONG_LUA_SSL_TRUSTED_CERTIFICATE.
+    tls_verify: true
+    tls_verify_depth: 2
 
     routes:
       - name: users-route
@@ -58,8 +59,7 @@ plugins:
   - name: cors
     config:
       origins:
-        - "https://localhost:5174"
-        - "http://localhost:5173"
+        - "https://app.fmsec.shop"
       methods:
         - GET
         - POST

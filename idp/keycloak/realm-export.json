@@ -51,12 +51,16 @@
       "redirectUris": [
         "http://localhost:5173/*",
         "http://localhost:5174/*",
-        "https://localhost:5174/*"
+        "https://localhost:5174/*",
+        "https://192.168.1.28/*",
+        "https://app.fmsec.shop/*"
       ],
       "webOrigins": [
         "http://localhost:5173",
         "http://localhost:5174",
-        "https://localhost:5174"
+        "https://localhost:5174",
+        "https://192.168.1.28",
+        "https://app.fmsec.shop"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",

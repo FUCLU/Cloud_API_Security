@@ -8,6 +8,8 @@ local JWT_HARDENING = {
 
 local JWKS_URL_PRIMARY = "http://keycloak:8080/realms/cloudapi/protocol/openid-connect/certs"
 local JWKS_URL_FALLBACK = "http://keycloak:8082/realms/cloudapi/protocol/openid-connect/certs"
+local EXPECTED_ISSUER = "https://auth.fmsec.shop/realms/cloudapi"
+local EXPECTED_CLIENT_ID = "spa-client"
 
 local jwks_cache = {
   expires_at = 0,
@@ -49,6 +51,65 @@ local function parse_jwt_header(token)
   end
 
   return header, nil
+end
+
+local function parse_jwt_payload(token)
+  local payload_b64 = token:match("^[^.]+%.([^.]+)%.[^.]+$")
+  if not payload_b64 then
+    return nil, "invalid_jwt_format"
+  end
+
+  local payload_json = b64url_decode(payload_b64)
+  if not payload_json then
+    return nil, "invalid_jwt_payload_base64"
+  end
+
+  local payload = cjson.decode(payload_json)
+  if not payload then
+    return nil, "invalid_jwt_payload_json"
+  end
+
+  return payload, nil
+end
+
+local function list_contains(values, expected)
+  if type(values) == "string" then
+    return values == expected
+  end
+  if type(values) == "table" then
+    for _, value in ipairs(values) do
+      if value == expected then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function validate_oidc_claims(payload)
+  local now = ngx.time()
+
+  if payload.iss ~= EXPECTED_ISSUER then
+    return nil, "invalid_issuer"
+  end
+
+  if type(payload.exp) ~= "number" or payload.exp <= now then
+    return nil, "token_expired"
+  end
+
+  if payload.nbf and type(payload.nbf) == "number" and payload.nbf > now + 30 then
+    return nil, "token_not_yet_valid"
+  end
+
+  if payload.azp and payload.azp ~= EXPECTED_CLIENT_ID then
+    return nil, "invalid_authorized_party"
+  end
+
+  if payload.aud and not list_contains(payload.aud, EXPECTED_CLIENT_ID) and payload.azp ~= EXPECTED_CLIENT_ID then
+    return nil, "invalid_audience"
+  end
+
+  return true, nil
 end
 
 local function fetch_jwks_kids(url)
@@ -140,6 +201,18 @@ function JWT_HARDENING:access(conf)
   if not kids[kid] then
     kong.log.err("kid_not_whitelisted")
     return kong.response.exit(401, { message = "Unknown token kid" })
+  end
+
+  local payload, payload_err = parse_jwt_payload(token)
+  if not payload then
+    kong.log.err("jwt_payload_parse_failed: ", payload_err)
+    return kong.response.exit(401, { message = "Invalid token payload" })
+  end
+
+  local ok, claims_err = validate_oidc_claims(payload)
+  if not ok then
+    kong.log.err("oidc_claims_rejected: ", claims_err)
+    return kong.response.exit(401, { message = "Invalid token claims" })
   end
 end
 

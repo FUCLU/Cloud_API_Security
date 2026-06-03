@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import Product
 from pydantic import BaseModel
 from typing import List
+from app.security.authorization import require_roles
 
 router = APIRouter(prefix="/api/v1/products", tags=["products"])
 
@@ -31,7 +32,8 @@ def get_products(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+def create_product(product: ProductCreate, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, {"admin", "staff"})
     product_data = (
         product.model_dump() if hasattr(product, "model_dump") else product.dict()
     )
@@ -44,8 +46,9 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 
 @router.put("/{product_id}", response_model=ProductResponse)
 def update_product(
-    product_id: int, product: ProductCreate, db: Session = Depends(get_db)
+    product_id: int, product: ProductCreate, request: Request, db: Session = Depends(get_db)
 ):
+    require_roles(request, {"admin", "staff"})
     db_product = db.query(Product).filter(Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")

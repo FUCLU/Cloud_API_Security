@@ -1,0 +1,5 @@
+{
+  "note": "Placeholder RESTler config. Fill in API spec path and target host before running fuzzing.",
+  "target": "https://localhost:8443",
+  "api_spec": "openapi.json"
+}
