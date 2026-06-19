@@ -7,7 +7,7 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { login, loginWithGoogle, resetAuth } = useAuth()
+  const { login, loginWithGoogle, logout, resetAuth } = useAuth()
 
   function fillDemo(demoEmail) {
     setEmail(demoEmail)
@@ -47,6 +47,12 @@ export default function Login() {
       setError(err?.message ?? 'Không thể đăng nhập Google')
       setLoading(false)
     }
+  }
+
+  function resetDemoSession() {
+    setLoading(true)
+    setError(null)
+    logout()
   }
 
   return (
@@ -112,6 +118,15 @@ export default function Login() {
               </svg>
             </span>
             <span>Đăng nhập với Google</span>
+          </button>
+
+          <button
+            className="btn-switch-account"
+            onClick={resetDemoSession}
+            disabled={loading}
+            title="Xóa phiên SSO hiện tại để đăng nhập lại từ đầu"
+          >
+            Reset phiên demo
           </button>
 
           <div className="demo-box">

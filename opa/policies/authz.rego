@@ -24,6 +24,10 @@ allow {
 }
 
 allow {
+  startswith(input.path, "/api/v1/auth")
+}
+
+allow {
   input.role == "admin"
 }
 

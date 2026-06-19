@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import PrivateRoute from './auth/PrivateRoute'
 import CallbackPage from './pages/CallbackPage'
+import { useAuth } from './hooks/useAuth'
 
 import Login from './pages/auth/Login'
 import Unauthorized from './pages/Unauthorized'
@@ -28,8 +29,19 @@ import StaffOrders from './pages/staff/Orders'
 
 // Customer pages
 import ProductCatalog from './pages/customer/ProductCatalog'
+import Cart from './pages/customer/Cart'
 import MyOrders from './pages/customer/MyOrders'
 import Profile from './pages/customer/Profile'
+
+function HomeRedirect() {
+  const { authReady, isAuthenticated, user } = useAuth()
+
+  if (!authReady) return null
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (user?.roles?.includes('admin')) return <Navigate to="/admin/dashboard" replace />
+  if (user?.roles?.includes('staff')) return <Navigate to="/staff/dashboard" replace />
+  return <Navigate to="/customer/productcatalog" replace />
+}
 
 export default function App() {
   return (
@@ -38,7 +50,7 @@ export default function App() {
         <Routes>
 
           {/* PUBLIC */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<CallbackPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
@@ -84,6 +96,7 @@ export default function App() {
             }
           >
             <Route path="productcatalog" element={<ProductCatalog />} />
+            <Route path="cart" element={<Cart />} />
             <Route path="myorders" element={<MyOrders />} />
             <Route path="profile" element={<Profile />} />
           </Route>

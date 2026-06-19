@@ -11,7 +11,10 @@ DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_NAME = os.getenv("POSTGRES_DB", "cloudapi")
 
 # Lắp ghép URL kết nối
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}",
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -27,8 +27,8 @@ REPORT_HTML = EVIDENCE / "zap_report.html"
 SUMMARY_JSON = EVIDENCE / "dast_summary.json"
 SUMMARY_MD = EVIDENCE / "dast_summary.md"
 CA_CERT = ROOT / "certs" / "ca.crt"
-CLIENT_CERT = ROOT / "certs" / "client.crt"
-CLIENT_KEY = ROOT / "certs" / "client.key"
+CLIENT_CERT = ROOT / "internal-certs" / "mtls" / "client.crt"
+CLIENT_KEY = ROOT / "internal-certs" / "mtls" / "client.key"
 
 
 def now() -> str:
@@ -273,7 +273,7 @@ def run_builtin_checks(frontend_url: str, api_url: str) -> list[dict]:
     alg_none = request(
         protected_url,
         method="GET",
-        headers={"Authorization": f"Bearer {forged_alg_none_token()}", "DPoP": "invalid"},
+        headers={"Authorization": f"Bearer {forged_alg_none_token()}"},
     )
     checks.append(
         test(
@@ -385,7 +385,7 @@ def write_markdown(checks: list[dict], zap: dict) -> None:
         "## Ý nghĩa",
         "",
         "Báo cáo này là kiểm thử black-box qua HTTPS, mô phỏng cách một client/attacker bên ngoài nhìn thấy hệ thống.",
-        "Các request hợp lệ qua Kong dùng CA nội bộ và client certificate `certs/client.crt` + `certs/client.key`.",
+        "Các request hợp lệ qua Kong dùng CA nội bộ và client certificate `internal-certs/mtls/client.crt` + `internal-certs/mtls/client.key`.",
         "",
         "## Checks",
         "",

@@ -1,9 +1,10 @@
-import { createDpopProof } from '../utils/dpop'
 const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL
 const REALM = import.meta.env.VITE_REALM
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 const REDIRECT_URI = `${window.location.origin}/callback`
 const BASE = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect`
+const LOGIN_STATE_KEYS = ['pkce_verifier', 'pkce_state']
 
 function b64url(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
@@ -24,6 +25,7 @@ async function generateChallenge(verifier) {
 export async function login(options = {}) {
   const { loginHint = '', idpHint = '', prompt = '' } = options
 
+  clearLoginState()
   const verifier = await generateVerifier()
   const challenge = await generateChallenge(verifier)
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)))
@@ -52,40 +54,6 @@ export async function loginWithGoogle() {
   return login({ idpHint: 'google', prompt: 'select_account' })
 }
 
-// Kept only for compatibility during migration. Prefer login() + PKCE.
-export async function loginWithPassword(email, password, totp = '') {
-  const body = new URLSearchParams({
-    grant_type: 'password',
-    client_id: CLIENT_ID,
-    username: email,
-    password,
-    scope: 'openid profile email roles',
-  })
-  if (totp) body.set('totp', totp)
-
-  const tokenEndpoint = `${BASE}/token`
-  const dpopProof = await createDpopProof({
-    htu: tokenEndpoint,
-    htm: 'POST',
-  })
-
-  const res = await fetch(tokenEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      DPoP: dpopProof,
-    },
-    body,
-  })
-
-  if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error_description ?? 'Đăng nhập thất bại')
-  }
-
-  return res.json()
-}
-
 export async function handleCallback() {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('code')
@@ -98,21 +66,13 @@ export async function handleCallback() {
   const verifier = sessionStorage.getItem('pkce_verifier')
   if (!verifier) throw new Error('Missing PKCE verifier')
 
-  const tokenEndpoint = `${BASE}/token`
-  const dpopProof = await createDpopProof({
-    htu: tokenEndpoint,
-    htm: 'POST',
-  })
-
-  const res = await fetch(tokenEndpoint, {
+  const res = await fetch(`${API_BASE}/api/v1/auth/callback`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      DPoP: dpopProof,
+      'Content-Type': 'application/json',
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: CLIENT_ID,
+    credentials: 'include',
+    body: JSON.stringify({
       redirect_uri: REDIRECT_URI,
       code,
       code_verifier: verifier,
@@ -120,8 +80,8 @@ export async function handleCallback() {
   })
 
   if (!res.ok) {
-    const err = await res.json()
-    throw new Error(`Token exchange failed: ${err.error_description}`)
+    const err = await res.json().catch(() => ({}))
+    throw new Error(`Token exchange failed: ${err.detail || res.status}`)
   }
 
   sessionStorage.removeItem('pkce_verifier')
@@ -129,49 +89,33 @@ export async function handleCallback() {
   return res.json()
 }
 
-export async function refreshTokens(refreshToken) {
-  const tokenEndpoint = `${BASE}/token`
-  const dpopProof = await createDpopProof({
-    htu: tokenEndpoint,
-    htm: 'POST',
+export async function getSession() {
+  const res = await fetch(`${API_BASE}/api/v1/auth/session`, {
+    method: 'GET',
+    credentials: 'include',
   })
-
-  const res = await fetch(tokenEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      DPoP: dpopProof,
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: CLIENT_ID,
-      refresh_token: refreshToken,
-    }),
-  })
-  if (!res.ok) throw new Error('Refresh token expired')
+  if (!res.ok) throw new Error('Session check failed')
   return res.json()
 }
 
-export function logout(idToken) {
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    post_logout_redirect_uri: `${window.location.origin}/login`,
+export async function logout() {
+  clearLoginState()
+  sessionStorage.removeItem('expected_login_email')
+
+  const res = await fetch(`${API_BASE}/api/v1/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
   })
-  if (idToken) params.set('id_token_hint', idToken)
-  window.location.href = `${BASE}/logout?${params}`
-}
-
-export function parseToken(token) {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const binary = atob(base64)
-    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
-    return JSON.parse(new TextDecoder('utf-8').decode(bytes))
-  } catch {
-    return null
+  const payload = await res.json().catch(() => ({}))
+  if (payload.logout_url) {
+    window.location.href = payload.logout_url
+    return
   }
+  window.location.href = `${window.location.origin}/login`
 }
 
-export function getRoles(token) {
-  return parseToken(token)?.realm_access?.roles ?? []
+export function clearLoginState() {
+  for (const key of LOGIN_STATE_KEYS) {
+    sessionStorage.removeItem(key)
+  }
 }

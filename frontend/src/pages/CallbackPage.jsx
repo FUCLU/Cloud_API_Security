@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { handleCallback, parseToken } from '../auth/keycloak'
+import { handleCallback } from '../auth/keycloak'
 import { useAuth } from '../hooks/useAuth'
 
 export default function CallbackPage() {
-  const { initFromTokens, user, resetAuth } = useAuth()
+  const { initFromSession, user, resetAuth } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -26,11 +26,9 @@ export default function CallbackPage() {
     if (manualCallback) return
 
     handleCallback()
-      .then(tokens => {
+      .then(session => {
         const expected = sessionStorage.getItem('expected_login_email')
-        const accessPayload = parseToken(tokens.access_token)
-        const idPayload = parseToken(tokens.id_token)
-        const actual = (accessPayload?.email || idPayload?.email || idPayload?.preferred_username || accessPayload?.preferred_username)?.toLowerCase?.()
+        const actual = (session.user?.email || session.user?.username)?.toLowerCase?.()
         sessionStorage.removeItem('expected_login_email')
 
         if (expected && actual && expected !== actual) {
@@ -39,7 +37,7 @@ export default function CallbackPage() {
           return
         }
 
-        initFromTokens(tokens)
+        initFromSession()
       })
       .catch(err => {
         console.error('[Callback]', err)
@@ -48,7 +46,7 @@ export default function CallbackPage() {
         sessionStorage.removeItem('pkce_state')
         setError(err.message)
       })
-  }, [initFromTokens, manualCallback, navigate, resetAuth])
+  }, [initFromSession, manualCallback, navigate, resetAuth])
 
   useEffect(() => {
     if (manualCallback) return

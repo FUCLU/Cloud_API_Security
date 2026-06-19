@@ -9,16 +9,11 @@ import json
 import os
 import secrets
 import sys
-import time
 import urllib.parse
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -37,8 +32,8 @@ CLIENT_ID = os.getenv("CLIENT_ID", "spa-client")
 REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:5173/callback")
 API_BASE = os.getenv("API_BASE", "https://localhost:8443")
 TLS_CA_CERT = os.getenv("TLS_CA_CERT", "certs/ca.crt")
-CLIENT_CERT = os.getenv("CLIENT_CERT", "certs/client.crt")
-CLIENT_KEY = os.getenv("CLIENT_KEY", "certs/client.key")
+CLIENT_CERT = os.getenv("CLIENT_CERT", "internal-certs/mtls/client.crt")
+CLIENT_KEY = os.getenv("CLIENT_KEY", "internal-certs/mtls/client.key")
 EVIDENCE_FILE = Path(os.getenv("EVIDENCE_FILE", "EVIDENCE/attack_results/bola/bola_e2e_result.json"))
 
 
@@ -67,45 +62,6 @@ def generate_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
-def public_jwk(private_key: ec.EllipticCurvePrivateKey) -> dict:
-    pub = private_key.public_key().public_numbers()
-    return {
-        "kty": "EC",
-        "crv": "P-256",
-        "x": b64url(pub.x.to_bytes(32, "big")),
-        "y": b64url(pub.y.to_bytes(32, "big")),
-    }
-
-
-def create_dpop_proof(
-    private_key: ec.EllipticCurvePrivateKey,
-    htm: str,
-    htu: str,
-    access_token: str | None = None,
-) -> str:
-    payload = {
-        "jti": str(uuid.uuid4()),
-        "htm": htm.upper(),
-        "htu": htu,
-        "iat": int(time.time()),
-    }
-    if access_token:
-        payload["ath"] = sha256_b64url(access_token)
-
-    header = {
-        "typ": "dpop+jwt",
-        "alg": "ES256",
-        "jwk": public_jwk(private_key),
-    }
-    encoded_header = b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    encoded_payload = b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
-    der_signature = private_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
-    r, s = decode_dss_signature(der_signature)
-    raw_signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
-    return f"{encoded_header}.{encoded_payload}.{b64url(raw_signature)}"
-
-
 def decode_payload(token: str) -> dict:
     payload_b64 = token.split(".")[1]
     padded = payload_b64 + "=" * (-len(payload_b64) % 4)
@@ -113,7 +69,6 @@ def decode_payload(token: str) -> dict:
 
 
 def get_token(label: str) -> dict:
-    private_key = ec.generate_private_key(ec.SECP256R1())
     verifier, challenge = generate_pkce_pair()
     state = b64url(secrets.token_bytes(16))
     auth_url = (
@@ -134,7 +89,6 @@ def get_token(label: str) -> dict:
     if not auth_code:
         raise RuntimeError(f"Thiếu authorization code cho {label}")
 
-    token_dpop = create_dpop_proof(private_key, "POST", KEYCLOAK_TOKEN_URL)
     res = requests.post(
         KEYCLOAK_TOKEN_URL,
         data={
@@ -144,7 +98,6 @@ def get_token(label: str) -> dict:
             "redirect_uri": REDIRECT_URI,
             "code_verifier": verifier,
         },
-        headers={"DPoP": token_dpop},
         timeout=20,
     )
     print(f"  Token endpoint status: {res.status_code}")
@@ -154,15 +107,13 @@ def get_token(label: str) -> dict:
     print(f"  sub  : {payload.get('sub')}")
     print(f"  email: {payload.get('email') or payload.get('preferred_username')}")
     print(f"  role : {payload.get('realm_access', {}).get('roles')}")
-    print(f"  cnf  : {payload.get('cnf')}")
-    return {"private_key": private_key, "access_token": access_token, "payload": payload}
+    return {"access_token": access_token, "payload": payload}
 
 
 def api_request(identity: dict, method: str, path: str, body: dict | None = None) -> requests.Response:
     url = f"{API_BASE}{path}"
     headers = {
         "Authorization": f"Bearer {identity['access_token']}",
-        "DPoP": create_dpop_proof(identity["private_key"], method, url, identity["access_token"]),
     }
     if body is not None:
         headers["Content-Type"] = "application/json"

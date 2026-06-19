@@ -6,15 +6,57 @@
 
 
 networks:
-  edge-net:       # Tầng ngoài: frontend, kong, keycloak tiếp nhận traffic
-  internal-net:   # Tầng trong: backend, db, cache, vault, opa — không expose ra ngoài
-  obs-net:        # Tầng quan sát: loki, promtail, grafana tách biệt
+  dmz-net:        # DMZ/Edge: frontend, WAF, Kong, Keycloak public endpoints
+  app-net:        # Application/Private: backend, OPA, Redis, internal app traffic
+  data-net:       # Data/Security: Postgres, Vault, KMS/secret operations
+  vault-backend-net: # Private backend network only between Vault TLS proxy and Vault dev backend
+  obs-net:        # Observability: Loki, Promtail, Grafana, Prometheus
 
 volumes:
   postgres_data:
   grafana_data:
   loki_data:
   prometheus_data:
+
+secrets:
+  internal_ca_cert:
+    file: ./internal-certs/ca.crt
+  app_tls_cert:
+    file: ./certs/app.crt
+  app_tls_key:
+    file: ./certs/app.key
+  auth_tls_cert:
+    file: ./certs/auth.crt
+  auth_tls_key:
+    file: ./certs/auth.key
+  kong_tls_cert:
+    file: ./certs/kong.crt
+  kong_tls_key:
+    file: ./certs/kong.key
+  backend_tls_cert:
+    file: ./internal-certs/backend.crt
+  backend_tls_key:
+    file: ./internal-certs/backend.key
+  opa_tls_cert:
+    file: ./internal-certs/opa.crt
+  opa_tls_key:
+    file: ./internal-certs/opa.key
+  postgres_tls_cert:
+    file: ./internal-certs/postgres.crt
+  postgres_tls_key:
+    file: ./internal-certs/postgres.key
+  redis_tls_cert:
+    file: ./internal-certs/redis.crt
+  redis_tls_key:
+    file: ./internal-certs/redis.key
+  vault_tls_cert:
+    file: ./internal-certs/vault.crt
+  vault_tls_key:
+    file: ./internal-certs/vault.key
+  mtls_client_cert:
+    file: ./internal-certs/mtls/client.crt
+  mtls_client_key:
+    file: ./internal-certs/mtls/client.key
 
 
 # TẦNG 1 — HẠ TẦNG (Infrastructure)
@@ -27,10 +69,32 @@ services:
     container_name: api-postgres
     restart: unless-stopped
     env_file: .env                        # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        cp /run/secrets/postgres_tls_cert /var/lib/postgresql/server.crt
+        cp /run/secrets/postgres_tls_key /var/lib/postgresql/server.key
+        chown postgres:postgres /var/lib/postgresql/server.crt /var/lib/postgresql/server.key
+        chmod 600 /var/lib/postgresql/server.key
+        printf '%s\n' \
+          'local all all trust' \
+          'hostnossl all all all reject' \
+          'hostssl all all all scram-sha-256' \
+          > /var/lib/postgresql/pg_hba_tls.conf
+        chown postgres:postgres /var/lib/postgresql/pg_hba_tls.conf
+        exec docker-entrypoint.sh postgres \
+          -c ssl=on \
+          -c ssl_cert_file=/var/lib/postgresql/server.crt \
+          -c ssl_key_file=/var/lib/postgresql/server.key \
+          -c hba_file=/var/lib/postgresql/pg_hba_tls.conf
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_tls_cert
+      - postgres_tls_key
     networks:
-      - internal-net
+      - data-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -41,19 +105,40 @@ services:
     image: redis:7
     container_name: api-redis
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mkdir -p /tmp/redis-tls
+        cp /run/secrets/redis_tls_cert /tmp/redis-tls/redis.crt
+        cp /run/secrets/redis_tls_key /tmp/redis-tls/redis.key
+        cp /run/secrets/internal_ca_cert /tmp/redis-tls/ca.crt
+        chown -R redis:redis /tmp/redis-tls
+        chmod 600 /tmp/redis-tls/redis.key
+        exec docker-entrypoint.sh redis-server \
+          --port 0 \
+          --tls-port 6379 \
+          --tls-cert-file /tmp/redis-tls/redis.crt \
+          --tls-key-file /tmp/redis-tls/redis.key \
+          --tls-ca-cert-file /tmp/redis-tls/ca.crt \
+          --tls-auth-clients no
+    secrets:
+      - internal_ca_cert
+      - redis_tls_cert
+      - redis_tls_key
     networks:
-      - internal-net
+      - app-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--tls", "--cacert", "/tmp/redis-tls/ca.crt", "-h", "redis", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Vault chạy dev mode — KHÔNG dùng cho production
-  # Dev mode: dữ liệu không persist, tự unseal, token = root
-  vault:
+  # Vault dev backend — KHÔNG dùng cho production.
+  # Service này chỉ nằm sau TLS proxy nội bộ `vault`.
+  vault-dev:
     image: hashicorp/vault:1.15
-    container_name: vault
+    container_name: vault-dev
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
@@ -63,9 +148,30 @@ services:
     volumes:
       - ./vault/init:/vault/init
     networks:
-      - internal-net
+      - vault-backend-net
     healthcheck:
       test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vault:
+    image: nginx:1.27-alpine
+    container_name: vault
+    restart: unless-stopped
+    depends_on:
+      vault-dev:
+        condition: service_healthy
+    volumes:
+      - ./vault/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    secrets:
+      - vault_tls_cert
+      - vault_tls_key
+    networks:
+      - data-net
+      - vault-backend-net
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,17 +185,20 @@ services:
       vault:
         condition: service_healthy
     environment:
-      VAULT_ADDR: http://vault:8200
+      VAULT_ADDR: https://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN}
+      VAULT_CACERT: /run/secrets/internal_ca_cert
     volumes:
       - ./vault/init:/vault/init
       - ./vault/policies:/vault/policies
+    secrets:
+      - internal_ca_cert
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         sh /vault/init/vault-init.sh
     networks:
-      - internal-net
+      - data-net
 
 
 # TẦNG 2 — XÁC THỰC (Auth / Identity)
@@ -99,20 +208,35 @@ services:
     image: quay.io/keycloak/keycloak:24.0
     container_name: keycloak
     restart: unless-stopped
-    command: start-dev --features=dpop --import-realm
+    command:
+      - start-dev
+      - --import-realm
+      - --https-certificate-file=/run/secrets/auth_tls_cert
+      - --https-certificate-key-file=/run/secrets/auth_tls_key
+      - --https-port=8443
+      - --http-enabled=false
     ports:
-      - "127.0.0.1:8082:8080"
+      - "127.0.0.1:8082:8443"
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME: ${KC_HOSTNAME}
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_PORT: "8443"
     volumes:
       - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    secrets:
+      - auth_tls_cert
+      - auth_tls_key
     networks:
-      - edge-net
-      - internal-net
+      dmz-net:
+        aliases:
+          - auth.fmsec.shop
+      app-net:
+        aliases:
+          - auth.fmsec.shop
     healthcheck:
       test: ["CMD-SHELL", "cat /proc/1/status || exit 1"]
       interval: 15s
@@ -132,6 +256,8 @@ services:
       - "run"
       - "--server"
       - "--addr=0.0.0.0:8181"
+      - "--tls-cert-file=/run/secrets/opa_tls_cert"
+      - "--tls-private-key-file=/run/secrets/opa_tls_key"
       - "--config-file=/config/opa-config.yaml"
       - "--set=decision_logs.console=true"
       - "/policies"
@@ -139,8 +265,11 @@ services:
       - ./opa/config:/config
       - ./opa/policies:/policies
       - ./opa/tests:/tests
+    secrets:
+      - opa_tls_cert
+      - opa_tls_key
     networks:
-      - internal-net
+      - app-net
     healthcheck:
       test: ["CMD", "/opa", "version"]
       interval: 10s
@@ -169,17 +298,20 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: bundled,opa-authz,jwt-hardening,hsts-header
-      KONG_SSL_CERT: /certs/kong.crt
-      KONG_SSL_CERT_KEY: /certs/kong.key
+      KONG_SSL_CERT: /run/secrets/kong_tls_cert
+      KONG_SSL_CERT_KEY: /run/secrets/kong_tls_key
       KONG_SSL_PROTOCOLS: "TLSv1.3"
-      KONG_LUA_SSL_TRUSTED_CERTIFICATE: /certs/ca.crt
+      KONG_LUA_SSL_TRUSTED_CERTIFICATE: /run/secrets/internal_ca_cert
       KONG_LUA_SSL_VERIFY_DEPTH: "2"
+      KONG_NGINX_PROXY_PROXY_SSL_TRUSTED_CERTIFICATE: /run/secrets/internal_ca_cert
+      KONG_NGINX_PROXY_PROXY_SSL_VERIFY_DEPTH: "2"
+      KONG_NGINX_PROXY_PROXY_SSL_SERVER_NAME: "on"
       # Chỉ mở HTTPS proxy; không expose HTTP plaintext qua Kong.
       KONG_PROXY_LISTEN: "0.0.0.0:8443 ssl http2"
       # Ép TLS 1.3 và yêu cầu client certificate ở proxy listener.
       # Client cert phải được ký bởi CA nội bộ trong certs/ca.crt.
       KONG_NGINX_PROXY_SSL_PROTOCOLS: "TLSv1.3"
-      KONG_NGINX_PROXY_SSL_CLIENT_CERTIFICATE: /certs/ca.crt
+      KONG_NGINX_PROXY_SSL_CLIENT_CERTIFICATE: /run/secrets/internal_ca_cert
       KONG_NGINX_PROXY_SSL_VERIFY_CLIENT: "on"
       KONG_NGINX_PROXY_SSL_VERIFY_DEPTH: "2"
       KONG_ADMIN_LISTEN: "off"
@@ -190,10 +322,13 @@ services:
       - ./gateway/plugins/jwt-hardening:/usr/local/share/lua/5.1/kong/plugins/jwt-hardening
       - ./gateway/plugins/hsts-header:/usr/local/share/lua/5.1/kong/plugins/hsts-header
       - ./gateway/plugins:/usr/local/kong/plugins
-      - ./certs:/certs:ro
+    secrets:
+      - internal_ca_cert
+      - kong_tls_cert
+      - kong_tls_key
     networks:
-      - edge-net
-      - internal-net
+      - dmz-net
+      - app-net
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -211,9 +346,14 @@ services:
       - "8443:8443"
     volumes:
       - ./waf/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certs:/certs:ro
+    secrets:
+      - internal_ca_cert
+      - kong_tls_cert
+      - kong_tls_key
+      - mtls_client_cert
+      - mtls_client_key
     networks:
-      - edge-net
+      - dmz-net
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 10s
@@ -238,19 +378,33 @@ services:
         condition: service_healthy
       vault:
         condition: service_healthy
-    volumes:
-      - ./certs:/certs:ro
+    secrets:
+      - internal_ca_cert
+      - backend_tls_cert
+      - backend_tls_key
     env_file: .env
     environment:
       PYTHONPATH: /app/app  
-      OPA_URL: http://opa:8181
-      VAULT_ADDR: http://vault:8200
+      BACKEND_TLS_CERT_PATH: /run/secrets/backend_tls_cert
+      BACKEND_TLS_KEY_PATH: /run/secrets/backend_tls_key
+      INTERNAL_CA_CERT_PATH: /run/secrets/internal_ca_cert
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=verify-full&sslrootcert=/run/secrets/internal_ca_cert"
+      KEYCLOAK_URL: https://auth.fmsec.shop:8443
+      KEYCLOAK_PUBLIC_URL: ${VITE_KEYCLOAK_URL}
+      KEYCLOAK_CLIENT_ID: ${VITE_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      FRONTEND_URL: https://app.fmsec.shop
+      OPA_URL: https://opa:8181
+      VAULT_ADDR: https://vault:8200
+      VAULT_CACERT: /run/secrets/internal_ca_cert
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_KEY_NAME: ${VAULT_KEY_NAME}
       VAULT_WRAPPED_DEK: ${VAULT_WRAPPED_DEK}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: rediss://redis:6379/0
+      REDIS_SSL_CA_CERTS: /run/secrets/internal_ca_cert
     networks:
-      - internal-net
+      - app-net
+      - data-net
     healthcheck:
       test: ["CMD", "python", "-c",
              "import ssl, urllib.request; urllib.request.urlopen('https://localhost:9000/health', context=ssl._create_unverified_context())"]
@@ -278,10 +432,16 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    volumes:
-      - ./certs:/certs:ro
+    secrets:
+      - internal_ca_cert
+      - app_tls_cert
+      - app_tls_key
+      - auth_tls_cert
+      - auth_tls_key
+      - mtls_client_cert
+      - mtls_client_key
     networks:
-      - edge-net
+      - dmz-net
     healthcheck:
       test: ["CMD-SHELL", "curl -k https://localhost:443 || exit 1"]
       interval: 10s
@@ -329,7 +489,7 @@ services:
     command: -config.file=/etc/promtail/config.yml
     networks:
       - obs-net
-      - internal-net
+      - app-net
 
   grafana:
     image: grafana/grafana:10.0.0
@@ -416,7 +576,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     networks:
-      - internal-net
+      - data-net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80/misc/ping || exit 1"]
       interval: 15s

@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react'
 
 const INIT_USERS = [
   { av:'LP', name:'Lưu Hồng Phúc',      email:'phuc@company.com',  role:'admin',    mfa:'WebAuthn', status:'active', last:'28/03 · 14:32', color:'#c84b2f',
-    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-001', roles:['admin'], exp:280, dpop:true,  jti:'abc-001' } },
+    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-001', roles:['admin'], exp:280,  jti:'abc-001' } },
   { av:'PH', name:'Phan Thái Hưng',      email:'hung@company.com',  role:'admin',    mfa:'TOTP',     status:'active', last:'28/03 · 13:10', color:'#1e4e7a',
-    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-002', roles:['admin'], exp:145, dpop:true,  jti:'abc-002' } },
+    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-002', roles:['admin'], exp:145,  jti:'abc-002' } },
   { av:'VK', name:'Võ Tưởng Tuấn Kiệt', email:'kiet@company.com',  role:'staff',    mfa:'TOTP',     status:'active', last:'28/03 · 11:44', color:'#2a6049',
-    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-003', roles:['staff'], exp:60,  dpop:false, jti:'abc-003' } },
+    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-003', roles:['staff'], exp:60, jti:'abc-003' } },
   { av:'NA', name:'Nguyễn Văn An',       email:'an@gmail.com',      role:'customer', mfa:'TOTP',     status:'active', last:'28/03 · 10:20', color:'#5a2d9a',
-    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-004', roles:['customer'], exp:210, dpop:true, jti:'abc-004' } },
+    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-004', roles:['customer'], exp:210, jti:'abc-004' } },
   { av:'TB', name:'Trần Thị Bích',       email:'bich@gmail.com',    role:'customer', mfa:'TOTP',     status:'locked', last:'26/03 · 08:15', color:'#b05a10',
     token:null },
   { av:'LC', name:'Lê Văn Cường',        email:'cuong@gmail.com',   role:'customer', mfa:'TOTP',     status:'active', last:'25/03 · 17:00', color:'#0f6674',
-    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-006', roles:['customer'], exp:55, dpop:false, jti:'abc-006' } },
+    token:{ iss:'http://localhost:8080/realms/company', sub:'uid-006', roles:['customer'], exp:55, jti:'abc-006' } },
 ]
 
 const ROLE_BADGE = { admin:'badge-red', staff:'badge-blue', customer:'badge-gray' }
@@ -57,12 +57,11 @@ function TokenInspector({ token }) {
         ['sub', token.sub],
         ['roles', token.roles.join(', ')],
         ['jti', token.jti],
-        ['DPoP bound', token.dpop ? 'true ✓' : 'false ✗'],
         ['alg', 'RS256'],
       ].map(([k, v]) => (
         <div key={k} style={{ display:'flex', gap:'8px', marginBottom:'5px' }}>
           <span style={{ fontSize:'11px', fontFamily:'monospace', color:'rgba(255,255,255,.35)', minWidth:'80px' }}>{k}</span>
-          <span style={{ fontSize:'11px', fontFamily:'monospace', color: k === 'DPoP bound' ? (token.dpop ? '#7ecfa0' : '#e8785f') : '#c8e6c9' }}>
+          <span style={{ fontSize:'11px', fontFamily:'monospace', color:'#c8e6c9' }}>
             {v}
           </span>
         </div>
@@ -293,3 +292,4 @@ export default function UserManagement() {
     </>
   )
 }
+

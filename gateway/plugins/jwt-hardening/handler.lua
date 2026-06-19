@@ -6,8 +6,9 @@ local JWT_HARDENING = {
   VERSION = "1.0.0",
 }
 
-local JWKS_URL_PRIMARY = "http://keycloak:8080/realms/cloudapi/protocol/openid-connect/certs"
-local JWKS_URL_FALLBACK = "http://keycloak:8082/realms/cloudapi/protocol/openid-connect/certs"
+local JWKS_URL_PRIMARY = "https://auth.fmsec.shop:8443/realms/cloudapi/protocol/openid-connect/certs"
+local JWKS_URL_FALLBACK = "https://auth.fmsec.shop:8443/realms/cloudapi/protocol/openid-connect/certs"
+local JWKS_TLS_SERVER_NAME = "auth.fmsec.shop"
 local EXPECTED_ISSUER = "https://auth.fmsec.shop/realms/cloudapi"
 local EXPECTED_CLIENT_ID = "spa-client"
 
@@ -119,6 +120,9 @@ local function fetch_jwks_kids(url)
   local res, err = httpc:request_uri(url, {
     method = "GET",
     headers = { ["Accept"] = "application/json" },
+    ssl_verify = true,
+    ssl_server_name = JWKS_TLS_SERVER_NAME,
+    ssl_verify_depth = 2,
   })
 
   if not res then

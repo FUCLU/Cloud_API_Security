@@ -14,8 +14,8 @@ if hasattr(sys.stderr, "reconfigure"):
 
 API_URL = os.getenv("API_URL", "https://localhost:8443/api/v1/users")
 TLS_CA_CERT = os.getenv("TLS_CA_CERT", "certs/ca.crt")
-CLIENT_CERT = os.getenv("CLIENT_CERT", "certs/client.crt")
-CLIENT_KEY = os.getenv("CLIENT_KEY", "certs/client.key")
+CLIENT_CERT = os.getenv("CLIENT_CERT", "internal-certs/mtls/client.crt")
+CLIENT_KEY = os.getenv("CLIENT_KEY", "internal-certs/mtls/client.key")
 EVIDENCE_FILE = Path(
     os.getenv(
         "EVIDENCE_FILE",

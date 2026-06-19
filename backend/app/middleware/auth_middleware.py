@@ -1,10 +1,10 @@
 from fastapi import Request
-from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.security.jwt_verify import verify_token
-from app.security.dpop_verifier import verify_dpop
+
+ACCESS_COOKIE = "cloudapi_access"
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -14,28 +14,29 @@ class AuthMiddleware(BaseHTTPMiddleware):
             '/docs',
             '/openapi.json',
             '/api/v1/orders/webhooks/orders',
+            '/api/v1/auth/callback',
+            '/api/v1/auth/session',
+            '/api/v1/auth/logout',
         ]
         if request.url.path in public_paths or request.url.path.startswith('/api/v1/webhooks'):
             return await call_next(request)
 
         auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
+        cookie_token = request.cookies.get(ACCESS_COOKIE)
+
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        elif cookie_token:
+            token = cookie_token
+        else:
             return JSONResponse(
                 status_code=401,
-                content={'detail': 'Missing or invalid Authorization header'},
+                content={'detail': 'Missing authenticated session'},
             )
-
-        token = auth_header.split(' ')[1]
 
         try:
             payload = await verify_token(token)
-            verify_dpop(request, token)
             request.state.user = payload
-        except HTTPException as e:
-            return JSONResponse(
-                status_code=e.status_code,
-                content={'detail': e.detail},
-            )
         except ValueError as e:
             return JSONResponse(
                 status_code=401,

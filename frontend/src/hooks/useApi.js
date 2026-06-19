@@ -1,8 +1,7 @@
 import { useAuth } from './useAuth'
-import { createDpopProof } from '../utils/dpop'
 
 export function useApi() {
-  const { accessToken, totpCode } = useAuth()
+  const { totpCode } = useAuth()
 
   // Wrapper để gọi API với Authorization + X-TOTP-Code headers
   async function apiCall(url, options = {}) {
@@ -14,16 +13,6 @@ export function useApi() {
       ...options.headers,
     }
 
-    // Thêm Authorization header
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`
-      headers.DPoP = await createDpopProof({
-        htu: requestUrl,
-        htm: method,
-        accessToken,
-      })
-    }
-
     // Thêm TOTP header nếu có
     if (totpCode) {
       headers['X-TOTP-Code'] = totpCode
@@ -33,6 +22,7 @@ export function useApi() {
       ...options,
       method,
       headers,
+      credentials: 'include',
     })
 
     if (!response.ok) {

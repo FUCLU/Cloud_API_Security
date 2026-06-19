@@ -7,7 +7,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger(__name__)
 
-VAULT_ADDR = os.getenv("VAULT_ADDR", "http://vault:8200")
+VAULT_ADDR = os.getenv("VAULT_ADDR", "https://vault:8200")
+VAULT_CACERT = os.getenv("VAULT_CACERT")
 VAULT_TOKEN = os.getenv("VAULT_TOKEN", "root")
 VAULT_KEY_NAME = os.getenv("VAULT_KEY_NAME", "dek")
 VAULT_WRAPPED_DEK = os.getenv("VAULT_WRAPPED_DEK", "")
@@ -18,6 +19,10 @@ def _vault_headers() -> dict[str, str]:
         "Content-Type": "application/json",
     }
 
+
+def _vault_verify() -> str | bool:
+    return VAULT_CACERT if VAULT_CACERT else True
+
 def wrap_dek_with_vault(raw_dek: bytes) -> str:
     if len(raw_dek) != 32:
         raise ValueError(f"DEK phải là 32 bytes, nhận {len(raw_dek)}")
@@ -26,6 +31,7 @@ def wrap_dek_with_vault(raw_dek: bytes) -> str:
         f"{VAULT_ADDR}/v1/transit/encrypt/{VAULT_KEY_NAME}",
         headers=_vault_headers(),
         json={"plaintext": b64_dek},
+        verify=_vault_verify(),
         timeout=5,
     )
     resp.raise_for_status()
@@ -42,6 +48,7 @@ def get_dek_from_vault() -> bytes:
         f"{VAULT_ADDR}/v1/transit/decrypt/{VAULT_KEY_NAME}",
         headers=_vault_headers(),
         json={"ciphertext": VAULT_WRAPPED_DEK},
+        verify=_vault_verify(),
         timeout=5,
     )
     resp2.raise_for_status()

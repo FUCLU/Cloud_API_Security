@@ -22,13 +22,29 @@ local function b64url_decode(input)
     return ngx.decode_base64(s)
 end
 
-local function extract_claims_from_bearer()
-    local auth = kong.request.get_header("authorization")
-    if not auth then
-        return {}
+local function token_from_cookie()
+    local cookie_header = kong.request.get_header("cookie")
+    if not cookie_header then
+        return nil
     end
 
-    local token = auth:match("^[Bb]earer%s+(.+)$")
+    for part in cookie_header:gmatch("[^;]+") do
+        local key, value = part:match("^%s*([^=]+)=([^;]+)%s*$")
+        if key == "cloudapi_access" then
+            return value
+        end
+    end
+
+    return nil
+end
+
+local function extract_claims_from_request()
+    local auth = kong.request.get_header("authorization")
+    local token = nil
+    if auth then
+        token = auth:match("^[Bb]earer%s+(.+)$")
+    end
+    token = token or token_from_cookie()
     if not token then
         return {}
     end
@@ -79,7 +95,7 @@ local function role_from_payload(payload)
 end
 
 function OPAAuthz:access(config)
-    local payload = extract_claims_from_bearer()
+    local payload = extract_claims_from_request()
 
     local input_payload = {
         input = {
@@ -97,6 +113,9 @@ function OPAAuthz:access(config)
         method = "POST",
         body = cjson.encode(input_payload),
         headers = { ["Content-Type"] = "application/json" },
+        ssl_verify = config.ssl_verify,
+        ssl_server_name = config.ssl_server_name,
+        ssl_verify_depth = config.ssl_verify_depth,
     })
 
     if not res then

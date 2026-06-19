@@ -1,5 +1,6 @@
-# gen_certs.py — Tạo bộ cert TLS/mTLS cho D1/D2
+# gen_certs.py — Tạo bộ cert nội bộ cho backend/OPA/mTLS
 import ipaddress
+import sys
 from cryptography import x509
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -13,9 +14,14 @@ SERVER_DAYS = 825
 CLIENT_DAYS = 365
 CA_CN = "CloudAPI Root CA"
 CA_ORG = "NT219"
-CERT_DIR = Path(__file__).parent.parent / "certs"
+CERT_DIR = Path(__file__).parent.parent / "internal-certs"
+MTLS_DIR = CERT_DIR / "mtls"
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 CERT_DIR.mkdir(exist_ok=True)
+MTLS_DIR.mkdir(exist_ok=True)
 print(f"Thư mục cert: {CERT_DIR}")
 
 
@@ -164,31 +170,14 @@ def make_client_cert(name, org, ca_key, ca_cert):
         )
         .sign(ca_key, hashes.SHA256())
     )
-    save_key(key, CERT_DIR / f"{name}.key")
-    save_cert(cert, CERT_DIR / f"{name}.crt")
+    save_key(key, MTLS_DIR / f"{name}.key")
+    save_cert(cert, MTLS_DIR / f"{name}.crt")
     return key, cert
 
 
 ca_key, ca_cert = make_ca()
 
 leaf_certs = []
-_, kong_cert = make_server_cert(
-    "kong",
-    "NT219-KONG",
-    [dns("localhost"), dns("api-gateway"), dns("kong"), ip("127.0.0.1")],
-    ca_key,
-    ca_cert,
-)
-leaf_certs.append(("kong.crt", kong_cert))
-
-_, frontend_cert = make_server_cert(
-    "frontend",
-    "NT219-FRONTEND",
-    [dns("localhost"), dns("api-frontend"), dns("frontend"), ip("127.0.0.1")],
-    ca_key,
-    ca_cert,
-)
-leaf_certs.append(("frontend.crt", frontend_cert))
 
 _, backend_cert = make_server_cert(
     "backend",
@@ -199,8 +188,44 @@ _, backend_cert = make_server_cert(
 )
 leaf_certs.append(("backend.crt", backend_cert))
 
+_, opa_cert = make_server_cert(
+    "opa",
+    "NT219-OPA",
+    [dns("localhost"), dns("opa"), ip("127.0.0.1")],
+    ca_key,
+    ca_cert,
+)
+leaf_certs.append(("opa.crt", opa_cert))
+
+_, postgres_cert = make_server_cert(
+    "postgres",
+    "NT219-POSTGRES",
+    [dns("localhost"), dns("postgres"), ip("127.0.0.1")],
+    ca_key,
+    ca_cert,
+)
+leaf_certs.append(("postgres.crt", postgres_cert))
+
+_, redis_cert = make_server_cert(
+    "redis",
+    "NT219-REDIS",
+    [dns("localhost"), dns("redis"), ip("127.0.0.1")],
+    ca_key,
+    ca_cert,
+)
+leaf_certs.append(("redis.crt", redis_cert))
+
+_, vault_cert = make_server_cert(
+    "vault",
+    "NT219-VAULT",
+    [dns("localhost"), dns("vault"), ip("127.0.0.1")],
+    ca_key,
+    ca_cert,
+)
+leaf_certs.append(("vault.crt", vault_cert))
+
 _, client_cert = make_client_cert("client", "NT219-CLIENT", ca_key, ca_cert)
-leaf_certs.append(("client.crt", client_cert))
+leaf_certs.append(("mtls/client.crt", client_cert))
 
 print("\nVerify chain...")
 ca_pub = ca_cert.public_key()
@@ -213,5 +238,6 @@ for name, cert in leaf_certs:
     print(f"  - {name}: OK")
 
 print(f"\nXong. Các file trong {CERT_DIR}:")
-for path in sorted(CERT_DIR.glob("*")):
-    print(f"  - {path.name}")
+for path in sorted(CERT_DIR.rglob("*")):
+    if path.is_file():
+        print(f"  - {path.relative_to(CERT_DIR)}")

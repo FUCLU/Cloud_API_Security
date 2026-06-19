@@ -3,7 +3,7 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 KONG_FILE="$ROOT_DIR/gateway/kong.yml"
-CA_FILE="$ROOT_DIR/certs/ca.crt"
+CA_FILE="$ROOT_DIR/internal-certs/ca.crt"
 BACKUP_FILE="$ROOT_DIR/gateway/kong.yml.bak-before-backend-ca"
 TMP_FILE="$ROOT_DIR/gateway/kong.yml.tmp"
 CA_ID="11111111-1111-1111-1111-111111111111"

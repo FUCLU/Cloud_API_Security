@@ -26,12 +26,6 @@ const securityEvidence = [
     test: 'python3 scripts/attacks/alg_none_attack.py',
   },
   {
-    name: 'DPoP replay protection',
-    status: 'Đã chứng minh',
-    source: 'backend/app/security/dpop_verifier.py, Redis',
-    test: 'python3 scripts/attacks/replay_dpop_attack.py',
-  },
-  {
     name: 'BOLA / IDOR',
     status: 'Đã chứng minh',
     source: 'backend/app/security/bola_guard.py, EVIDENCE/attack_results/bola/bola_result.txt',
@@ -313,3 +307,4 @@ export default function AdminSystemSettings() {
     </>
   )
 }
+

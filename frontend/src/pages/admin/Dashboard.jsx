@@ -17,7 +17,7 @@ const AUDIT_LOG = [
   { time:'14:22', tag:'deny',  text:'BOLA: user1 truy cập order của user2' },
   { time:'14:15', tag:'warn',  text:'Rate limit 95% — IP 10.0.0.8' },
   { time:'14:09', tag:'allow', text:'Key rotation hoàn thành — Vault v12' },
-  { time:'14:01', tag:'deny',  text:'DPoP replay bị chặn — jti đã dùng' },
+  { time:'14:01', tag:'deny',  text:'JWT không hợp lệ bị chặn ở gateway' },
 ]
 
 const SEC_STATUS = [
@@ -26,8 +26,8 @@ const SEC_STATUS = [
   { dot:'ok',   name:'OPA Policy',       val:'7 rules' },
   { dot:'ok',   name:'Vault KEK',        val:'Rotated 4m ago' },
   { dot:'warn', name:'TOTP',             val:'1 expired' },
-  { dot:'ok',   name:'Redis jti store',  val:'0 replay' },
-  { dot:'ok',   name:'DPoP Binding',     val:'Active' },
+  { dot:'ok',   name:'Redis session',    val:'Healthy' },
+  { dot:'ok',   name:'HttpOnly Cookie',  val:'Active' },
   { dot:'ok',   name:'CORS',             val:'localhost:3000' },
 ]
 
@@ -275,7 +275,7 @@ export default function AdminDashboard() {
                 <div className="card-body" style={{padding:'12px 16px'}}>
                   {[
                     {icon:'🚫', name:'JWT alg=none',    status:'BLOCKED', badge:'badge-green', count:'3 lần'},
-                    {icon:'🔄', name:'DPoP Replay',      status:'BLOCKED', badge:'badge-green', count:'1 lần'},
+                    {icon:'🍪', name:'Cookie theft attempt', status:'BLOCKED', badge:'badge-green', count:'1 lần'},
                     {icon:'👤', name:'BOLA / IDOR',      status:'BLOCKED', badge:'badge-green', count:'5 lần'},
                     {icon:'🌐', name:'SSRF attempt',     status:'BLOCKED', badge:'badge-green', count:'0 lần'},
                   ].map(item => (

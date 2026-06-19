@@ -1,52 +1,96 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
-const ORDERS = [
-  { id:'ORD-1042', name:'Nguyễn Văn An',     userId:'uid-004', role:'customer', email:'an.nv@gmail.com',    date:'28/03 · 14:21', items:'Laptop ASUS (x1)',    amount:'15,490,000đ', status:'success',  addr:'123 Nguyễn Huệ, Q1',      secFlag: null },
-  { id:'ORD-1041', name:'Trần Thị Bích',      userId:'uid-005', role:'customer', email:'bich.tt@gmail.com',  date:'28/03 · 13:10', items:'Chuột Logitech (x2)', amount:'3,780,000đ',  status:'pending',  addr:'45 Lê Lợi, Q3',            secFlag: null },
-  { id:'ORD-1040', name:'Lê Văn Cường',       userId:'uid-006', role:'customer', email:'cuong.lv@gmail.com', date:'28/03 · 11:44', items:'Tai nghe Sony (x1)',  amount:'7,990,000đ',  status:'shipping', addr:'88 Hai Bà Trưng, Q1',       secFlag: 'bola' },
-  { id:'ORD-1039', name:'Phạm Thị Dung',      userId:'uid-007', role:'customer', email:'dung.pt@gmail.com',  date:'27/03 · 16:00', items:'Áo polo (x3)',        amount:'1,470,000đ',  status:'failed',   addr:'12 Đinh Tiên Hoàng, Q1',   secFlag: null },
-  { id:'ORD-1038', name:'Hoàng Thị Emm',      userId:'uid-008', role:'customer', email:'emm.ht@gmail.com',   date:'27/03 · 14:30', items:'Bàn phím (x1)',       amount:'2,450,000đ',  status:'shipping', addr:'77 Pasteur, Q3',            secFlag: null },
-  { id:'ORD-1037', name:'Võ Tuấn Tuấn Kiệt',       userId:'uid-003', role:'staff',    email:'kiet.vt@gmail.com',  date:'27/03 · 09:12', items:'Màn hình LG (x1)',    amount:'6,800,000đ',  status:'new',      addr:'99 Nam Kỳ Khởi Nghĩa',     secFlag: null },
-  { id:'ORD-1036', name:'Phan Thái Hưng',     userId:'uid-002', role:'admin',    email:'hung.pt@gmail.com',  date:'26/03 · 17:55', items:'Sổ tay A5 (x5)',      amount:'325,000đ',    status:'success',  addr:'10 Tôn Thất Tùng',         secFlag: null },
-  { id:'ORD-1035', name:'Nguyễn T. Giang',    userId:'uid-009', role:'customer', email:'giang.nt@gmail.com', date:'26/03 · 15:20', items:'Cà phê (x3)',         amount:'540,000đ',    status:'pending',  addr:'55 Cách Mạng Tháng 8',     secFlag: 'rate' },
-]
+const ORDERS_KEY_PREFIX = 'customer_orders:'
 
 const STATUS_LABEL = { new:'Mới', pending:'Đang xử lý', shipping:'Đang giao', success:'Hoàn thành', failed:'Thất bại' }
 const STATUS_BADGE = { new:'badge-purple', pending:'badge-amber', shipping:'badge-blue', success:'badge-green', failed:'badge-red' }
 const ROLE_BADGE = { admin:'badge-red', staff:'badge-blue', customer:'badge-gray' }
 
-const SEC_FLAG_INFO = {
-  bola: { badge:'badge-red', label:'BOLA attempt', detail:'User uid-004 đã cố truy cập đơn hàng này — OPA đã chặn (owner mismatch).' },
-  rate: { badge:'badge-amber', label:'Rate limit hit', detail:'IP của user này đã hit rate limit 95% trong session hiện tại.' },
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
+}
+
+function formatDate(value) {
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      day:'2-digit',
+      month:'2-digit',
+      year:'numeric',
+      hour:'2-digit',
+      minute:'2-digit',
+    }).format(new Date(value))
+  } catch {
+    return value
+  }
+}
+
+function summarizeItems(items = []) {
+  return items.map(item => `${item.n} (x${item.qty})`).join(', ')
+}
+
+function loadAllCustomerOrders() {
+  const orders = []
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith(ORDERS_KEY_PREFIX)) continue
+
+    try {
+      const storedOrders = JSON.parse(localStorage.getItem(key)) ?? []
+      storedOrders.forEach(order => orders.push({ ...order, storageKey: key }))
+    } catch {
+      // Ignore malformed local demo data.
+    }
+  }
+
+  return orders.sort((a, b) => new Date(b.date) - new Date(a.date))
 }
 
 export default function AdminOrders() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const filtered = ORDERS.filter(o =>
-    (filter === 'all' || o.status === filter) &&
-    (o.name.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search))
-  )
+  const orders = useMemo(() => loadAllCustomerOrders(), [reloadKey])
+  const filtered = orders.filter(order => {
+    const customer = order.customer || {}
+    const haystack = `${order.id} ${customer.name || ''} ${customer.email || ''} ${summarizeItems(order.items)}`.toLowerCase()
+    return (filter === 'all' || order.status === filter) && haystack.includes(search.toLowerCase())
+  })
+
+  const counts = orders.reduce((acc, order) => {
+    acc[order.status] = (acc[order.status] || 0) + 1
+    return acc
+  }, { all: orders.length })
+
+  function refresh() {
+    setReloadKey(value => value + 1)
+  }
 
   return (
     <>
       <div className="topbar">
         <div>
           <div className="topbar-title">Quản lý đơn hàng</div>
+          <div className="topbar-sub">Đơn phát sinh từ tài khoản customer</div>
         </div>
         <div className="topbar-right">
-          <button className="btn btn-outline btn-sm">📤 Xuất Excel</button>
-          <button className="btn btn-primary btn-sm">+ Tạo đơn</button>
+          <button className="btn btn-outline btn-sm" onClick={refresh}>Làm mới</button>
         </div>
       </div>
 
       <div className="content">
         <div className="status-tabs">
-          {[['all','Tổng',8],['new','Mới',1],['pending','Đang xử lý',2],['shipping','Đang giao',2],['success','Hoàn thành',2],['failed','Thất bại',1]].map(([k,l,c]) => (
-            <div key={k} className={'stab'+(filter===k?' active':'')} onClick={() => setFilter(k)}>
-              {l} <span className="cnt">{c}</span>
+          {[
+            ['all','Tổng'],
+            ['new','Mới'],
+            ['pending','Đang xử lý'],
+            ['shipping','Đang giao'],
+            ['success','Hoàn thành'],
+            ['failed','Thất bại'],
+          ].map(([key, label]) => (
+            <div key={key} className={'stab' + (filter === key ? ' active' : '')} onClick={() => setFilter(key)}>
+              {label} <span className="cnt">{counts[key] || 0}</span>
             </div>
           ))}
         </div>
@@ -54,7 +98,7 @@ export default function AdminOrders() {
         <div className="filter-bar">
           <div className="search-box">
             <span>🔍</span>
-            <input placeholder="Tìm mã đơn, tên khách..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input placeholder="Tìm mã đơn, tên khách, email..." value={search} onChange={event => setSearch(event.target.value)} />
           </div>
         </div>
 
@@ -67,35 +111,33 @@ export default function AdminOrders() {
                   <th>Khách hàng</th>
                   <th>Role</th>
                   <th>Ngày đặt</th>
+                  <th>Sản phẩm</th>
                   <th>Tổng tiền</th>
                   <th>Trạng thái</th>
-                  <th>Security</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(o => (
-                  <tr key={o.id} style={{ background: o.secFlag ? '#fffaf5' : undefined }}>
-                    <td style={{fontWeight:700}}>#{o.id}</td>
-                    <td>
-                      <div style={{fontWeight:500}}>{o.name}</div>
-                      <div style={{fontSize:'11px',color:'var(--muted)',fontFamily:'monospace'}}>{o.userId}</div>
-                    </td>
-                    <td><span className={`badge ${ROLE_BADGE[o.role]}`}>{o.role}</span></td>
-                    <td style={{fontSize:'12px',color:'var(--muted)'}}>{o.date}</td>
-                    <td style={{fontWeight:500}}>{o.amount}</td>
-                    <td><span className={`badge ${STATUS_BADGE[o.status]}`}>{STATUS_LABEL[o.status]}</span></td>
-                    <td>
-                      {o.secFlag
-                        ? <span className={`badge ${SEC_FLAG_INFO[o.secFlag].badge}`}>{SEC_FLAG_INFO[o.secFlag].label}</span>
-                        : <span style={{fontSize:'11px',color:'var(--muted)'}}>—</span>
-                      }
-                    </td>
-                    <td>
-                      <button className="btn btn-outline btn-xs" onClick={() => setSelected(o)}>Chi tiết</button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(order => {
+                  const customer = order.customer || {}
+                  return (
+                    <tr key={`${order.storageKey}-${order.id}`}>
+                      <td style={{ fontWeight:700 }}>#{order.id}</td>
+                      <td>
+                        <div style={{ fontWeight:500 }}>{customer.name || 'Khách hàng'}</div>
+                        <div style={{ fontSize:'11px', color:'var(--muted)' }}>{customer.email || customer.id || 'unknown'}</div>
+                      </td>
+                      <td><span className={`badge ${ROLE_BADGE[customer.role || 'customer']}`}>{customer.role || 'customer'}</span></td>
+                      <td style={{ fontSize:'12px', color:'var(--muted)' }}>{formatDate(order.date)}</td>
+                      <td style={{ maxWidth:260 }}>{summarizeItems(order.items)}</td>
+                      <td style={{ fontWeight:500 }}>{formatMoney(order.amount)}</td>
+                      <td><span className={`badge ${STATUS_BADGE[order.status]}`}>{STATUS_LABEL[order.status]}</span></td>
+                      <td>
+                        <button className="btn btn-outline btn-xs" onClick={() => setSelected(order)}>Chi tiết</button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -105,54 +147,43 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {selected && (
+      {selected ? (
         <>
           <div className="drawer-overlay open" onClick={() => setSelected(null)} />
           <div className="drawer open">
             <div className="drawer-header">
               <div>
-                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'20px'}}>#{selected.id}</div>
-                <div style={{fontSize:'12px',color:'var(--muted)',marginTop:'3px'}}>{selected.date}</div>
+                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:'20px' }}>#{selected.id}</div>
+                <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'3px' }}>{formatDate(selected.date)}</div>
               </div>
-              <button className="drawer-close" onClick={() => setSelected(null)}>✕</button>
+              <button className="drawer-close" onClick={() => setSelected(null)}>×</button>
             </div>
             <div className="drawer-body">
               {[
-                ['Khách hàng', selected.name],
-                ['User ID',    selected.userId],
-                ['Role',       selected.role],
-                ['Email',      selected.email],
-                ['Sản phẩm',  selected.items],
-                ['Tổng tiền',  selected.amount],
-                ['Địa chỉ',   selected.addr],
-              ].map(([k,v]) => (
-                <div key={k} className="sec-item">
-                  <span className="sec-name">{k}</span>
-                  <span className="sec-val" style={k==='Tổng tiền'?{fontWeight:700}:k==='User ID'?{fontFamily:'monospace',fontSize:'12px'}:{}}>{v}</span>
+                ['Khách hàng', selected.customer?.name || 'Khách hàng'],
+                ['Email', selected.customer?.email || 'unknown'],
+                ['User ID', selected.customer?.id || 'unknown'],
+                ['Sản phẩm', summarizeItems(selected.items)],
+                ['Tổng tiền', formatMoney(selected.amount)],
+                ['Địa chỉ', selected.address],
+                ['Thanh toán', selected.pay],
+              ].map(([key, value]) => (
+                <div key={key} className="sec-item">
+                  <span className="sec-name">{key}</span>
+                  <span className="sec-val" style={key === 'Tổng tiền' ? { fontWeight:700 } : undefined}>{value}</span>
                 </div>
               ))}
               <div className="sec-item">
                 <span className="sec-name">Trạng thái</span>
                 <span className={`badge ${STATUS_BADGE[selected.status]}`}>{STATUS_LABEL[selected.status]}</span>
               </div>
-              {selected.secFlag && (
-                <div style={{ marginTop:'14px', background:'#fff8e8', border:'1px solid #f5d98a', borderRadius:'8px', padding:'10px 12px' }}>
-                  <div style={{ fontSize:'11px', fontWeight:700, color:'var(--amber)', textTransform:'uppercase', marginBottom:'4px' }}>
-                    ⚠️ Security Flag: {SEC_FLAG_INFO[selected.secFlag].label}
-                  </div>
-                  <div style={{ fontSize:'12px', color:'var(--ink)', lineHeight:'1.5' }}>
-                    {SEC_FLAG_INFO[selected.secFlag].detail}
-                  </div>
-                </div>
-              )}
             </div>
             <div className="drawer-footer">
-              <button className="btn btn-primary" style={{flex:1}}>Cập nhật trạng thái</button>
-              <button className="btn btn-outline" onClick={() => setSelected(null)}>Đóng</button>
+              <button className="btn btn-outline" style={{ flex:1 }} onClick={() => setSelected(null)}>Đóng</button>
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </>
   )
 }

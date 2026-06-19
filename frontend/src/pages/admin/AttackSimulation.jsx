@@ -10,7 +10,6 @@ const KONG_HOST = (() => {
 })()
 
 const FAKE_JWT = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InJzYS1rZXktMSJ9.eyJzdWIiOiJ1aWQtMDA0IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy9jb21wYW55IiwiYXVkIjoic3BhLWNsaWVudCIsInJvbGVzIjpbImN1c3RvbWVyIl0sImV4cCI6MTcxMTYzNTYwMCwiaWF0IjoxNzExNjM1MzAwLCJqdGkiOiJhYmMtMDA0In0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
-const FAKE_DPOP = 'eyJhbGciOiJFUzI1NiIsInR5cCI6ImRwb3AranQiLCJqd2siOnsiYWxnIjoiRUMyNTYiLCJrdHkiOiJFQyIsImNydiI6IlAtMjU2In19.eyJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cDovL2xvY2FsaG9zdDo4MDAwL2FwaS92MS9vcmRlcnMiLCJpYXQiOjE3MTE2MzUzMDAsImp0aSI6Impvb3AtMDAxIn0.replay_stolen_signature_xyz'
 const FAKE_ALG_NONE = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImlzcyI6ImF0dGFja2VyLmNvbSIsImV4cCI6OTk5OTk5OTk5OX0.'
 
 const ATTACKS_INIT = [
@@ -39,35 +38,6 @@ const ATTACKS_INIT = [
       opa_decision: { allow: false, deny_reason: 'BOLA / owner mismatch', policy: 'authz.rego:12' },
       blocked_by: 'OPA authz policy',
       latency_ms: 12,
-    },
-  },
-  {
-    id: 'dpop',
-    icon: '🔄',
-    name: 'DPoP Token Replay',
-    label: 'badge-amber',
-    category: 'Token Security',
-    desc: 'Attacker stolen DPoP proof (jti: joop-001) và replay lại request. Redis phát hiện jti đã tồn tại → reject.',
-    script: 'scripts/attacks/replay_dpop_attack.py',
-    editableFields: { path: '/api/v1/orders', body: '{\n  "product_id": "prod-001",\n  "quantity": 1\n}' },
-    buildRequest: (f) => ({
-      method: 'POST', path: f.path, body: f.body,
-      headers: {
-        'Host': KONG_HOST,
-        'Authorization': `DPoP ${FAKE_JWT}`,
-        'DPoP': FAKE_DPOP,
-        'X-Request-ID': 'req-replay-001',
-        'X-Forwarded-For': '10.0.0.22',
-        'Content-Type': 'application/json',
-      },
-    }),
-    mockResponse: {
-      status: 'BLOCKED', http_code: 401,
-      detail: 'DPoP proof replay detected: jti already used',
-      jti: 'joop-001',
-      redis_key: 'dpop:jti:joop-001',
-      blocked_by: 'Redis SET NX jti check (dpop_verifier.py)',
-      latency_ms: 8,
     },
   },
   {
@@ -133,7 +103,7 @@ const ATTACKS_INIT = [
 
 function buildRaw(method, path, headers, body) {
   const hLines = Object.entries(headers).map(([k,v]) =>
-    `${k}: ${(k==='Authorization'||k==='DPoP') ? v.slice(0,72)+'...' : v}`
+    `${k}: ${(k==='Authorization') ? v.slice(0,72)+'...' : v}`
   ).join('\n')
   return `${method} ${path} HTTP/1.1\n${hLines}${body ? '\n\n'+body : ''}`
 }
@@ -306,8 +276,8 @@ export default function AttackSimulation() {
                               <span key={k}>
                                 <span style={{color:'#ef9a9a'}}>{k}</span>
                                 <span style={{color:'#666'}}>: </span>
-                                <span style={{color:(k==='Authorization'||k==='DPoP')?'#ce93d8':'#a5d6a7'}}>
-                                  {(k==='Authorization'||k==='DPoP') ? v.slice(0,70)+'...' : v}
+                                <span style={{color:(k==='Authorization')?'#ce93d8':'#a5d6a7'}}>
+                                  {(k==='Authorization') ? v.slice(0,70)+'...' : v}
                                 </span>{'\n'}
                               </span>
                             ))}
@@ -397,3 +367,4 @@ export default function AttackSimulation() {
     </>
   )
 }
+

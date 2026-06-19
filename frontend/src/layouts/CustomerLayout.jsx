@@ -20,6 +20,9 @@ export default function CustomerLayout() {
           <NavLink to="/customer/myorders" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Đơn của tôi
           </NavLink>
+          <NavLink to="/customer/cart" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            Giỏ hàng
+          </NavLink>
           <NavLink to="/customer/profile" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Tài khoản
           </NavLink>

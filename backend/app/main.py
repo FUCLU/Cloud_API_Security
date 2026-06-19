@@ -14,8 +14,8 @@ from app.middleware.auth_middleware import AuthMiddleware
 APP_TITLE = "Cloud API Security Backend"
 APP_VERSION = "1.0.0"
 DEFAULT_CORS_ORIGINS = "https://localhost:5174"
-TLS_CERT_PATH = "/certs/backend.crt"
-TLS_KEY_PATH = "/certs/backend.key"
+TLS_CERT_PATH = os.getenv("BACKEND_TLS_CERT_PATH", "/run/secrets/backend_tls_cert")
+TLS_KEY_PATH = os.getenv("BACKEND_TLS_KEY_PATH", "/run/secrets/backend_tls_key")
 
 
 def parse_cors_origins() -> list[str]:
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
         allow_origins=parse_cors_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "DPoP", "Content-Type"],
+        allow_headers=["Authorization", "X-TOTP-Code", "Content-Type"],
     )
     app.add_middleware(AuthMiddleware)
 

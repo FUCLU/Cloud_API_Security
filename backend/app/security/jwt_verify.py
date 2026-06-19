@@ -1,15 +1,19 @@
 from jose import jwt, jwk, JWTError
 from jose.utils import base64url_decode
 import httpx
+import os
 from app.core.config import settings
 
 # Cache key để không fetch mỗi request
 _jwks_cache: dict | None = None
+INTERNAL_CA_CERT_PATH = os.getenv("INTERNAL_CA_CERT_PATH")
+KEYCLOAK_CA_CERT_PATH = os.getenv("KEYCLOAK_CA_CERT_PATH")
 
 async def get_jwks() -> dict:
     global _jwks_cache
     if _jwks_cache is None:
-        async with httpx.AsyncClient() as client:
+        verify = KEYCLOAK_CA_CERT_PATH if KEYCLOAK_CA_CERT_PATH else True
+        async with httpx.AsyncClient(verify=verify) as client:
             res = await client.get(settings.jwks_url)
             res.raise_for_status()
             _jwks_cache = res.json()
