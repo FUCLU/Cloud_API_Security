@@ -33,15 +33,12 @@ postgres_data/
 
 # TLS Certs — tự generate bằng scripts/gen_certs.py
 certs/*.key
-certs/*.crt
 certs/*.csr
 certs/*.srl
 internal-certs/*.key
-internal-certs/*.crt
 internal-certs/*.csr
 internal-certs/*.srl
 internal-certs/mtls/*.key
-internal-certs/mtls/*.crt
 internal-certs/mtls/*.csr
 internal-certs/mtls/*.srl
 
