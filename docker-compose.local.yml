@@ -1,12 +1,33 @@
-# Local Windows/dev override.
-# Run with:
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# Local Windows/dev override — HTTPS với self-signed TLS cho localhost
 #
-# Public URLs in this mode:
-#   App      : https://localhost:9443
+# Run:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local up -d --build
+#
+# Public URLs:
+#   Frontend : https://localhost:9444
 #   Keycloak : https://localhost:8082
-#
-# The production compose stays domain-based; this file keeps localhost behavior explicit.
+
+secrets:
+  auth_tls_cert:
+    file: ./certs-local/localhost.crt
+  auth_tls_key:
+    file: ./certs-local/localhost.key
+  app_tls_cert:
+    file: ./certs-local/localhost.crt
+  app_tls_key:
+    file: ./certs-local/localhost.key
+  kong_tls_cert:
+    file: ./certs-local/localhost.crt
+  kong_tls_key:
+    file: ./certs-local/localhost.key
+  backend_tls_cert:
+    file: ./certs-local/localhost.crt
+  backend_tls_key:
+    file: ./certs-local/localhost.key
+  opa_tls_cert:
+    file: ./certs-local/localhost.crt
+  opa_tls_key:
+    file: ./certs-local/localhost.key
 
 volumes:
   keycloak_data:
@@ -14,28 +35,66 @@ volumes:
     external: false
 
 services:
+
   keycloak:
+    ports:
+      - "127.0.0.1:8082:8443"
     environment:
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: "8082"
+      KC_HOSTNAME:        localhost
+      KC_HOSTNAME_PORT:   "8082"
       KC_HOSTNAME_STRICT: "false"
-      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_HEADERS:   xforwarded
+      KC_HTTP_ENABLED:    "false"
+      KC_HTTPS_PORT:      "8443"
+    networks:
+      dmz-net:
+        aliases:
+          - keycloak
+      app-net:
+        aliases:
+          - keycloak
 
   backend:
     environment:
-      KEYCLOAK_URL: https://auth.fmsec.shop:8443
-      KEYCLOAK_PUBLIC_URL: https://localhost:8082
-      FRONTEND_URL: https://localhost:9443
-      JWT_ISSUER: https://localhost:8082/realms/cloudapi
-      BACKEND_CORS_ORIGINS: https://localhost:9443
-      AUTH_COOKIE_SECURE: "true"
+      KEYCLOAK_URL:           https://keycloak:8443
+      KEYCLOAK_PUBLIC_URL:    https://localhost:8082
+      FRONTEND_URL:           https://localhost:9444
+      JWT_ISSUER:             https://localhost:8082/realms/cloudapi
+      BACKEND_CORS_ORIGINS:   https://localhost:9444
+      AUTH_COOKIE_SECURE:     "true"
+      REQUESTS_CA_BUNDLE:     /app/certs-local/ca-bundle.crt
+      SSL_CERT_FILE:          /app/certs-local/ca-bundle.crt
+      # Cho httpx verify Keycloak cert dùng local CA
+      KEYCLOAK_CA_CERT_PATH:  /app/certs-local/ca-bundle.crt
+    volumes:
+      - ./certs-local/ca-bundle.crt:/app/certs-local/ca-bundle.crt:ro
+
+  waf:
+    ports:
+      - "9443:8443"
+    volumes:
+      - ./waf/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
 
   frontend:
+    ports:
+      - "9444:443"
+      - "9080:80"
+    environment:
+      FRONTEND_HTTPS_PORT: "9444"
+      FRONTEND_HTTP_PORT:  "9080"
     build:
       args:
         VITE_KEYCLOAK_URL: https://localhost:8082
-        VITE_KONG_URL: https://localhost:9443/api
-        VITE_REALM: ${VITE_REALM}
-        VITE_CLIENT_ID: ${VITE_CLIENT_ID}
+        VITE_KONG_URL:     https://localhost:9444/api
+        VITE_REALM:        ${VITE_REALM}
+        VITE_CLIENT_ID:    ${VITE_CLIENT_ID}
     volumes:
       - ./frontend/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+
+  kong:
+    volumes:
+      - ./gateway/kong.local.yml:/usr/local/kong/declarative/kong.yml
+      - ./gateway/plugins/opa-authz:/usr/local/share/lua/5.1/kong/plugins/opa-authz
+      - ./gateway/plugins/jwt-hardening:/usr/local/share/lua/5.1/kong/plugins/jwt-hardening
+      - ./gateway/plugins/hsts-header:/usr/local/share/lua/5.1/kong/plugins/hsts-header
+      - ./gateway/plugins:/usr/local/kong/plugins

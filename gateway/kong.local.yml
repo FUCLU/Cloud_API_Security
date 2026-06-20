@@ -1,0 +1,125 @@
+_format_version: "3.0"
+
+ca_certificates:
+  # Internal CA — dùng cho production (giữ nguyên)
+  - id: 11111111-1111-1111-1111-111111111111
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBjzCCATWgAwIBAgIUe5SBtwqi4RFyACBJO+d8xJqH/8EwCgYIKoZIzj0EAwIw
+      HTEbMBkGA1UEAwwSQ2xvdWQgQVBJIExvY2FsIENBMB4XDTI2MDYwMzEzMTMxN1oX
+      DTM2MDUzMTEzMTMxN1owHTEbMBkGA1UEAwwSQ2xvdWQgQVBJIExvY2FsIENBMFkw
+      EwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIs5fQ+eBqfvm9IQz8nkyug7w3lqm/D26
+      u1e/V6Hy+bjGiSuFlT0LLihgg2cqMrh7GpG6SWY/amoUp1IVBGoUUKNTMFEwHQYD
+      VR0OBBYEFAUC/pUtB5gc3y1ARnYr/qvoNoSHMB8GA1UdIwQYMBaAFAUC/pUtB5gc
+      3y1ARnYr/qvoNoSHMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIg
+      LZXinS+bjVCxml7kXbTuSKARNvrpz5eGlQXy4mBzBUoCIQDXVtgVDi6m0ENAfmvz
+      nu9iCPy+Ng4LN5nsnrnBkhzSTA==
+      -----END CERTIFICATE-----
+
+  # Local dev CA — ký certs-local/localhost.crt (backend, opa, keycloak)
+  - id: 22222222-2222-2222-2222-222222222222
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      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
+      -----END CERTIFICATE-----
+
+services:
+  - name: backend-service
+    url: https://api-backend:9000
+    tls_verify: true
+    tls_verify_depth: 2
+    ca_certificates:
+      - 22222222-2222-2222-2222-222222222222   # ← local dev CA
+
+    routes:
+      - name: users-route
+        paths: [/api/v1/users]
+        strip_path: false
+      - name: products-route
+        paths: [/api/v1/products]
+        strip_path: false
+      - name: orders-route
+        paths: [/api/v1/orders]
+        strip_path: false
+      - name: auth-route
+        paths: [/api/v1/auth]
+        strip_path: false
+      - name: security-route
+        paths: [/api/v1/security]
+        strip_path: false
+      - name: health-route
+        paths: [/health]
+        strip_path: false
+      - name: root-route
+        paths: [/]
+        strip_path: false
+
+plugins:
+  - name: jwt-hardening
+
+  - name: hsts-header
+
+  - name: opa-authz
+    config:
+      opa_url: "https://opa:8181/v1/data/authz"
+      ssl_verify: false          # ← local: OPA dùng certs-local CA chưa load vào Kong lua
+      ssl_server_name: "opa"
+      ssl_verify_depth: 2
+
+  - name: cors
+    config:
+      origins:
+        - "https://app.fmsec.shop"
+        - "https://localhost:9444"
+        - "https://localhost:9443"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - X-TOTP-Code
+        - Content-Type
+      credentials: true
+
+  - name: rate-limiting
+    config:
+      minute: 100
+      policy: local
+
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options:nosniff"
+          - "X-Frame-Options:DENY"
