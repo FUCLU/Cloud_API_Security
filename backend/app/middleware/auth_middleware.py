@@ -17,6 +17,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             '/api/v1/auth/callback',
             '/api/v1/auth/session',
             '/api/v1/auth/logout',
+            '/api/v1/auth/totp/reset-demo',
         ]
         if request.url.path in public_paths or request.url.path.startswith('/api/v1/webhooks'):
             return await call_next(request)

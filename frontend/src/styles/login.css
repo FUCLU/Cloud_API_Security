@@ -131,3 +131,25 @@
   .form-title { font-size: 30px; }
   .left { display: none; }
 }
+
+.login-page .left-content {
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+}
+
+.login-page .brand {
+  width: 100%;
+  justify-content: center;
+  gap: 0;
+}
+
+.login-page .brand-icon {
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
+.login-page .brand-name {
+  display: none;
+}

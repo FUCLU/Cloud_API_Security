@@ -17,6 +17,9 @@ volumes:
   grafana_data:
   loki_data:
   prometheus_data:
+  keycloak_data:
+    external: true
+    name: cloud_api_security_keycloak_data
 
 secrets:
   internal_ca_cert:
@@ -226,6 +229,7 @@ services:
       KC_HTTP_ENABLED: "false"
       KC_HTTPS_PORT: "8443"
     volumes:
+      - keycloak_data:/opt/keycloak/data
       - ./idp/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
     secrets:
       - auth_tls_cert

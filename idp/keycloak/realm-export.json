@@ -94,6 +94,7 @@
       "config": {
         "clientId": "679393827886-fnimrsjluoue2n568kn0nfqt5jpmt7ip.apps.googleusercontent.com",
         "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
+        "hideOnLoginPage": "true",
         "useJwksUrl": "true",
         "defaultScope": "openid profile email"
       }

@@ -3,11 +3,13 @@ import logo from '../../../src/logo.png'
 import '../../styles/login.css'
 import { useAuth } from '../../hooks/useAuth'
 
+const API_BASE = import.meta.env.VITE_API_BASE || ''
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { login, loginWithGoogle, logout, resetAuth } = useAuth()
+  const { login, loginWithGoogle, resetAuth } = useAuth()
 
   function fillDemo(demoEmail) {
     setEmail(demoEmail)
@@ -49,10 +51,36 @@ export default function Login() {
     }
   }
 
-  function resetDemoSession() {
+  async function resetAccount() {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setError('Nhập hoặc chọn tài khoản admin/staff cần reset TOTP trước.')
+      return
+    }
+
     setLoading(true)
     setError(null)
-    logout()
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/totp/reset-demo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: normalizedEmail }),
+      })
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(payload.detail || 'Không thể reset tài khoản này')
+      }
+
+      resetAuth()
+      sessionStorage.setItem('expected_login_email', normalizedEmail)
+      await login({ loginHint: normalizedEmail, prompt: 'login' })
+    } catch (err) {
+      setError(err?.message ?? 'Không thể reset account')
+      setLoading(false)
+    }
   }
 
   return (
@@ -61,9 +89,6 @@ export default function Login() {
         <div className="left-content">
           <div className="brand">
             <img className="brand-icon" src={logo} alt="logo" />
-            <div>
-              <div className="brand-name">E - MARKET</div>
-            </div>
           </div>
           <div className="hero">
             <h1>Mua sắm thả ga<br /> giao hàng tận nhà</h1>
@@ -75,7 +100,7 @@ export default function Login() {
         <div className="form-wrap">
           <div className="auth-header">
             <div className="form-title">Đăng nhập</div>
-            <div className="form-sub">Chào mừng trở lại E-Market.</div>
+            <div className="form-sub">Chào mừng trở lại.</div>
           </div>
 
           <div className="field">
@@ -122,11 +147,11 @@ export default function Login() {
 
           <button
             className="btn-switch-account"
-            onClick={resetDemoSession}
+            onClick={resetAccount}
             disabled={loading}
-            title="Xóa phiên SSO hiện tại để đăng nhập lại từ đầu"
+            title="Reset TOTP cho tài khoản demo admin/staff để quét QR lại"
           >
-            Reset phiên demo
+            Reset account
           </button>
 
           <div className="demo-box">

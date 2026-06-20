@@ -48,6 +48,26 @@ function loadJson(key, fallback) {
   }
 }
 
+function OrderItemImage({ item }) {
+  return item.img ? (
+    <>
+      <img
+        className="order-item-photo"
+        src={item.img}
+        alt={item.n}
+        loading="lazy"
+        onError={event => {
+          event.currentTarget.style.display = 'none'
+          event.currentTarget.nextElementSibling?.classList.add('show')
+        }}
+      />
+      <span className="product-image-fallback">{item.e}</span>
+    </>
+  ) : (
+    <span className="product-image-fallback show">{item.e}</span>
+  )
+}
+
 export default function MyOrders() {
   const { user } = useAuth()
   const ordersKey = useMemo(() => getCustomerStorageKey(ORDERS_KEY_PREFIX, user), [user])
@@ -113,7 +133,9 @@ export default function MyOrders() {
                 <div className="order-items-preview">
                   {order.items.slice(0, 2).map(item => (
                     <div className="order-item-row" key={`${order.id}-${item.n}`}>
-                      <span className="order-item-icon">{item.e}</span>
+                      <span className="order-item-icon">
+                        <OrderItemImage item={item} />
+                      </span>
                       <span>{item.n}</span>
                       <span>x{item.qty}</span>
                     </div>
@@ -164,7 +186,9 @@ export default function MyOrders() {
                 <div className="section-title">Sản phẩm</div>
                 {selected.items.map(item => (
                   <div className="cart-line" key={`${selected.id}-${item.n}`}>
-                    <div className="cart-line-icon">{item.e}</div>
+                    <div className="cart-line-icon">
+                      <OrderItemImage item={item} />
+                    </div>
                     <div className="cart-line-main">
                       <div className="cart-line-name">{item.n}</div>
                       <div className="cart-line-meta">{formatMoney(item.p)} · x{item.qty}</div>

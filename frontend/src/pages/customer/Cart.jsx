@@ -20,6 +20,26 @@ function loadJson(key, fallback) {
   }
 }
 
+function CartItemImage({ item }) {
+  return item.img ? (
+    <>
+      <img
+        className="cart-line-photo"
+        src={item.img}
+        alt={item.n}
+        loading="lazy"
+        onError={event => {
+          event.currentTarget.style.display = 'none'
+          event.currentTarget.nextElementSibling?.classList.add('show')
+        }}
+      />
+      <span className="product-image-fallback">{item.e}</span>
+    </>
+  ) : (
+    <span className="product-image-fallback show">{item.e}</span>
+  )
+}
+
 export default function Cart() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -124,7 +144,9 @@ export default function Cart() {
             <div className="cart-lines-large">
               {cart.map(item => (
                 <div className="cart-line cart-line-large" key={item.id}>
-                  <div className="cart-line-icon">{item.e}</div>
+                  <div className="cart-line-icon">
+                    <CartItemImage item={item} />
+                  </div>
                   <div className="cart-line-main">
                     <div className="cart-line-name">{item.n}</div>
                     <div className="cart-line-meta">{formatMoney(item.p)}</div>

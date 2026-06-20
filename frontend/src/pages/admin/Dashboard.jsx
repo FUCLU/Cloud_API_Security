@@ -210,7 +210,6 @@ export default function AdminDashboard() {
                 <div className="card-header">
                   <div className="card-title">Security Audit Log</div>
                   <div style={{display:'flex',gap:'8px'}}>
-                    <a className="card-link" onClick={() => navigate('/admin/attacks')}>Simulate attack →</a>
                     <button className="btn btn-outline btn-sm" onClick={() => window.open('http://localhost:3000')}>📈 Grafana</button>
                   </div>
                 </div>
@@ -270,7 +269,6 @@ export default function AdminDashboard() {
               <div className="card">
                 <div className="card-header">
                   <div className="card-title">Attack vectors phát hiện</div>
-                  <a className="card-link" onClick={() => navigate('/admin/attacks')}>Test →</a>
                 </div>
                 <div className="card-body" style={{padding:'12px 16px'}}>
                   {[
@@ -286,11 +284,6 @@ export default function AdminDashboard() {
                       <span className={`badge ${item.badge}`}>{item.status}</span>
                     </div>
                   ))}
-                  <div style={{marginTop:'14px'}}>
-                    <button className="btn btn-primary btn-sm" style={{width:'100%'}} onClick={() => navigate('/admin/attacks')}>
-                      ⚡ Mở Attack Simulation →
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

@@ -20,7 +20,6 @@ import AdminUsers from './pages/admin/UserManagement'
 import AdminProducts from './pages/admin/Products'
 import AdminOrders from './pages/admin/Orders'
 import SystemSettings from './pages/admin/SystemSettings'
-import AttackSimulation from './pages/admin/AttackSimulation'
 
 // Staff pages
 import StaffDashboard from './pages/staff/Dashboard'
@@ -69,7 +68,6 @@ export default function App() {
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="settings" element={<SystemSettings />} />
-            <Route path="attacks" element={<AttackSimulation />} />
           </Route>
 
           {/* STAFF + LAYOUT */}

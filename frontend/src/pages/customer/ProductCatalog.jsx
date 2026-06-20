@@ -6,14 +6,86 @@ import { getCustomerStorageKey } from '../../utils/customerStorage'
 const CART_KEY_PREFIX = 'customer_cart'
 
 const CPRODS = [
-  { id: 'P-1001', n: 'Laptop ASUS VivoBook 15', c: 'Điện tử', p: 15490000, e: '💻', d: 'Core i5, 8GB RAM, 512GB SSD', s: 'ok' },
-  { id: 'P-1002', n: 'Chuột Logitech MX3', c: 'Điện tử', p: 1890000, e: '🖱️', d: 'Bluetooth, USB-C', s: 'ok' },
-  { id: 'P-1003', n: 'Bàn phím Keychron K2', c: 'Điện tử', p: 2450000, e: '⌨️', d: 'Switch Brown, layout 75%', s: 'low' },
-  { id: 'P-1004', n: 'Tai nghe Sony WH-1000XM5', c: 'Điện tử', p: 7990000, e: '🎧', d: 'ANC, 30h pin', s: 'ok' },
-  { id: 'P-1005', n: 'Cà phê Arabica Đà Lạt', c: 'Thực phẩm', p: 180000, e: '☕', d: '500g, rang mộc', s: 'ok' },
-  { id: 'P-1006', n: 'Trà Oolong Lâm Đồng', c: 'Thực phẩm', p: 95000, e: '🍵', d: '100g, thượng hạng', s: 'ok' },
-  { id: 'P-1007', n: 'Áo polo nam Uniqlo', c: 'Thời trang', p: 490000, e: '👕', d: 'Cotton 100%', s: 'low' },
-  { id: 'P-1008', n: 'Sổ tay A5 dotted', c: 'Văn phòng', p: 65000, e: '📓', d: '160 trang, bìa cứng', s: 'ok' },
+  {
+    id: 'P-1001',
+    n: 'Laptop ASUS VivoBook 15',
+    c: 'Điện tử',
+    p: 15490000,
+    e: 'Laptop',
+    img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=80',
+    d: 'Core i5, 8GB RAM, 512GB SSD',
+    s: 'ok',
+  },
+  {
+    id: 'P-1002',
+    n: 'Chuột Logitech MX3',
+    c: 'Điện tử',
+    p: 1890000,
+    e: 'Mouse',
+    img: 'https://images.unsplash.com/photo-1527814050087-3793815479db?auto=format&fit=crop&w=900&q=80',
+    d: 'Bluetooth, USB-C',
+    s: 'ok',
+  },
+  {
+    id: 'P-1003',
+    n: 'Bàn phím Keychron K2',
+    c: 'Điện tử',
+    p: 2450000,
+    e: 'Keyboard',
+    img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=900&q=80',
+    d: 'Switch Brown, layout 75%',
+    s: 'low',
+  },
+  {
+    id: 'P-1004',
+    n: 'Tai nghe Sony WH-1000XM5',
+    c: 'Điện tử',
+    p: 7990000,
+    e: 'Headphones',
+    img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80',
+    d: 'ANC, 30h pin',
+    s: 'ok',
+  },
+  {
+    id: 'P-1005',
+    n: 'Cà phê Arabica Đà Lạt',
+    c: 'Thực phẩm',
+    p: 180000,
+    e: 'Coffee',
+    img: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=900&q=80',
+    d: '500g, rang mộc',
+    s: 'ok',
+  },
+  {
+    id: 'P-1006',
+    n: 'Trà Oolong Lâm Đồng',
+    c: 'Thực phẩm',
+    p: 95000,
+    e: 'Tea',
+    img: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=80',
+    d: '100g, thượng hạng',
+    s: 'ok',
+  },
+  {
+    id: 'P-1007',
+    n: 'Áo polo nam Uniqlo',
+    c: 'Thời trang',
+    p: 490000,
+    e: 'Polo',
+    img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80',
+    d: 'Cotton 100%',
+    s: 'low',
+  },
+  {
+    id: 'P-1008',
+    n: 'Sổ tay A5 dotted',
+    c: 'Văn phòng',
+    p: 65000,
+    e: 'Notebook',
+    img: 'https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=900&q=80',
+    d: '160 trang, bìa cứng',
+    s: 'ok',
+  },
 ]
 
 function formatMoney(value) {
@@ -26,6 +98,24 @@ function loadJson(key, fallback) {
   } catch {
     return fallback
   }
+}
+
+function ProductImage({ item }) {
+  return (
+    <>
+      <img
+        className="product-photo"
+        src={item.img}
+        alt={item.n}
+        loading="lazy"
+        onError={event => {
+          event.currentTarget.style.display = 'none'
+          event.currentTarget.nextElementSibling?.classList.add('show')
+        }}
+      />
+      <span className="product-image-fallback">{item.e}</span>
+    </>
+  )
 }
 
 export default function ProductCatalog() {
@@ -98,7 +188,9 @@ export default function ProductCatalog() {
         <div className="cat-grid">
           {filtered.map(product => (
             <div key={product.id} className="pcard">
-              <div className="pimg">{product.e}</div>
+              <div className="pimg">
+                <ProductImage item={product} />
+              </div>
               <div className="pbody">
                 <div className="pname">{product.n}</div>
                 <div className="pdesc">{product.c} · {product.d}</div>

@@ -31,6 +31,13 @@ COOKIE_KWARGS = {
 }
 INTERNAL_CA_CERT_PATH = os.getenv("INTERNAL_CA_CERT_PATH")
 KEYCLOAK_CA_CERT_PATH = os.getenv("KEYCLOAK_CA_CERT_PATH")
+DEMO_TOTP_RESET_EMAILS = {
+    "phuc@company.com",
+    "hung@company.com",
+    "kiet@company.com",
+}
+KEYCLOAK_ADMIN_USERNAME = os.getenv("KEYCLOAK_ADMIN", "admin")
+KEYCLOAK_ADMIN_PASSWORD = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "")
 
 
 def get_db():
@@ -84,6 +91,72 @@ async def exchange_token(form: dict) -> dict:
             pass
         raise HTTPException(status_code=401, detail=detail)
     return res.json()
+
+
+def keycloak_verify():
+    return KEYCLOAK_CA_CERT_PATH if KEYCLOAK_CA_CERT_PATH else True
+
+
+async def get_keycloak_admin_token() -> str:
+    if not KEYCLOAK_ADMIN_USERNAME or not KEYCLOAK_ADMIN_PASSWORD:
+        raise HTTPException(status_code=500, detail="Missing Keycloak admin credentials")
+
+    token_url = f"{settings.keycloak_url}/realms/master/protocol/openid-connect/token"
+    async with httpx.AsyncClient(verify=keycloak_verify(), timeout=15) as client:
+        res = await client.post(token_url, data={
+            "grant_type": "password",
+            "client_id": "admin-cli",
+            "username": KEYCLOAK_ADMIN_USERNAME,
+            "password": KEYCLOAK_ADMIN_PASSWORD,
+        })
+
+    if res.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Cannot authenticate to Keycloak admin API")
+
+    return res.json()["access_token"]
+
+
+async def reset_keycloak_totp_required_action(email: str) -> None:
+    admin_token = await get_keycloak_admin_token()
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    admin_base = f"{settings.keycloak_url}/admin/realms/{settings.keycloak_realm}"
+
+    async with httpx.AsyncClient(verify=keycloak_verify(), timeout=20) as client:
+        users_res = await client.get(
+            f"{admin_base}/users",
+            headers=headers,
+            params={"email": email, "exact": "true"},
+        )
+        if users_res.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Cannot query Keycloak user")
+
+        users = users_res.json()
+        if not users:
+            raise HTTPException(status_code=404, detail="Keycloak user not found")
+
+        user = users[0]
+        user_id = user["id"]
+
+        credentials_res = await client.get(f"{admin_base}/users/{user_id}/credentials", headers=headers)
+        if credentials_res.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Cannot query Keycloak credentials")
+
+        for credential in credentials_res.json():
+            if credential.get("type") == "otp":
+                delete_res = await client.delete(
+                    f"{admin_base}/users/{user_id}/credentials/{credential['id']}",
+                    headers=headers,
+                )
+                if delete_res.status_code >= 400:
+                    raise HTTPException(status_code=502, detail="Cannot remove Keycloak OTP credential")
+
+        required_actions = set(user.get("requiredActions") or [])
+        required_actions.add("CONFIGURE_TOTP")
+        user["requiredActions"] = sorted(required_actions)
+
+        update_res = await client.put(f"{admin_base}/users/{user_id}", headers=headers, json=user)
+        if update_res.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Cannot update Keycloak required actions")
 
 
 @router.post('/callback')
@@ -152,6 +225,29 @@ async def session_logout(request: Request, response: Response):
         logout_url = f"{settings.oidc_logout_url}?{query}"
 
     return {"ok": True, "logout_url": logout_url}
+
+
+@router.post('/totp/reset-demo')
+async def reset_demo_totp(payload: dict, response: Response, db: Session = Depends(get_db)):
+    email = (payload.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if email not in DEMO_TOTP_RESET_EMAILS:
+        raise HTTPException(status_code=403, detail="Only demo admin/staff accounts can be reset")
+
+    await reset_keycloak_totp_required_action(email)
+
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        user.totp_secret = None
+        db.commit()
+
+    clear_auth_cookies(response)
+    return {
+        "ok": True,
+        "email": email,
+        "message": "Keycloak TOTP reset. The next login will require QR setup again.",
+    }
 
 
 @router.get('/totp/status')

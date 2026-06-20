@@ -38,11 +38,6 @@ export default function AdminLayout() {
             <span className="sb-icon">⊙</span>Cài đặt hệ thống
           </NavLink>
 
-          <div className="sb-section">Bảo mật</div>
-          <NavLink to="/admin/attacks" className={({ isActive }) => 'sb-item' + (isActive ? ' active' : '')}>
-            <span className="sb-icon">⚡</span>Attack Simulation
-            <span className="sb-badge" style={{ background:'#c84b2f' }}>Test</span>
-          </NavLink>
         </div>
 
         <div className="sb-footer">

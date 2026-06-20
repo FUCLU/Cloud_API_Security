@@ -29,6 +29,25 @@ function summarizeItems(items = []) {
   return items.map(item => `${item.n} (x${item.qty})`).join(', ')
 }
 
+function OrderItemsPreview({ items = [] }) {
+  const visibleItems = items.slice(0, 3)
+  return (
+    <div className="order-preview">
+      <div className="order-preview-images">
+        {visibleItems.map((item, index) => (
+          <span className="order-preview-thumb" key={`${item.id || item.n}-${index}`}>
+            {item.img ? <img src={item.img} alt={item.n} loading="lazy" /> : <span>{item.e || 'SP'}</span>}
+          </span>
+        ))}
+      </div>
+      <div className="order-preview-text">
+        <strong>{items[0]?.n || 'Chưa có sản phẩm'}</strong>
+        <span>{items.length > 1 ? `+${items.length - 1} sản phẩm khác` : `${items[0]?.qty || 0} sản phẩm`}</span>
+      </div>
+    </div>
+  )
+}
+
 function loadAllCustomerOrders() {
   const orders = []
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -136,7 +155,7 @@ export default function StaffOrders() {
                       <div style={{ fontSize:'11px', color:'var(--muted)' }}>{order.customer?.email || ''}</div>
                     </td>
                     <td>{formatDate(order.date)}</td>
-                    <td>{summarizeItems(order.items)}</td>
+                    <td style={{ minWidth:260 }}><OrderItemsPreview items={order.items} /></td>
                     <td>{formatMoney(order.amount)}</td>
                     <td><span className={`badge ${SC[order.status]}`}>{SL[order.status]}</span></td>
                     <td>
