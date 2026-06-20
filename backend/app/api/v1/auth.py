@@ -25,7 +25,7 @@ REFRESH_COOKIE = "cloudapi_refresh"
 ID_COOKIE = "cloudapi_id"
 COOKIE_KWARGS = {
     "httponly": True,
-    "secure": True,
+    "secure": settings.auth_cookie_secure,
     "samesite": "lax",
     "path": "/",
 }
@@ -70,7 +70,7 @@ def set_auth_cookies(response: Response, tokens: dict) -> None:
 
 def clear_auth_cookies(response: Response) -> None:
     for cookie_name in (ACCESS_COOKIE, REFRESH_COOKIE, ID_COOKIE):
-        response.delete_cookie(cookie_name, path="/", secure=True, samesite="lax")
+        response.delete_cookie(cookie_name, path="/", secure=settings.auth_cookie_secure, samesite="lax")
 
 
 async def exchange_token(form: dict) -> dict:

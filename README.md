@@ -80,7 +80,7 @@ Toàn bộ traffic nội bộ giữa các service đều chạy qua TLS (TLS 1.3
 | `keycloak` | Keycloak 24.0 | IdP – OIDC, realm management | `dmz-net`, `app-net` |
 | `opa` | OPA 0.65.0 | Policy Engine – Rego authorization | `app-net` |
 | `api-backend` | Python 3.12 / FastAPI | Business logic + security modules | `app-net`, `data-net` |
-| `api-redis` | Redis 7 TLS | Cache nonce / DPoP / session | `app-net` |
+| `api-redis` | Redis 7 TLS | Cache/session runtime | `app-net` |
 | `api-postgres` | PostgreSQL 16 TLS | Datastore chính | `data-net` |
 | `vault` | Nginx TLS Proxy | Vault TLS endpoint | `data-net` |
 | `vault-dev` | HashiCorp Vault 1.15 | KMS – Transit Engine (KEK) | `vault-backend-net` |
@@ -319,7 +319,7 @@ Cloud_Api_Security/
 │   │   ├── ssrf_attack.py
 │   │   └── role_escalation_test.py
 │   ├── evaluation/             # Evaluation scripts (TLS, TOTP, AEAD, rotation)
-│   ├── security_testing/       # DAST (ZAP), SAST (Bandit), Fuzz (RESTler)
+│   ├── security_testing/       # SAST/SCA, DAST/ZAP evidence scripts
 │   └── gen_certs.py            # Certificate generation helper
 ├── tests/
 │   ├── integration/            # API flow, auth flow, policy flow
@@ -384,9 +384,25 @@ GRAFANA_PASSWORD=<strong-password>
  
 Các biến `VAULT_WRAPPED_DEK` và `VAULT_KEY_NAME` sẽ được populate sau khi `vault-init` chạy lần đầu. Xem hướng dẫn tại [`vault/init/wrap-dek.sh`](vault/init/wrap-dek.sh).
  
-### Bước 3: Cấu hình hostname (local development)
- 
-Thêm các dòng sau vào `/etc/hosts` (Linux/macOS) hoặc `C:\Windows\System32\drivers\etc\hosts` (Windows):
+### Bước 3: Chọn chế độ chạy
+
+Dự án có hai chế độ chạy riêng biệt, không trộn cấu hình với nhau:
+
+| Chế độ | Mục đích | URL chính | File compose |
+|---|---|---|---|
+| Local HTTPS | Chạy thử trên máy cá nhân trước khi deploy | `https://localhost:9443` | `docker-compose.yml` + `docker-compose.local.yml` |
+| Server/domain | Chạy trên Ubuntu/server thật với domain | `https://app.fmsec.shop` | `docker-compose.yml` |
+
+Với **Local HTTPS**, không cần sửa hosts file. App chạy bằng `https://localhost:9443`, Keycloak chạy bằng `https://localhost:8082`.
+
+Trong `.env` local nên đặt:
+
+```dotenv
+FRONTEND_HTTP_PORT=9080
+FRONTEND_HTTPS_PORT=9443
+```
+
+Với **Server/domain**, cần trỏ DNS hoặc hosts về IP server. Nếu chạy thử domain trên máy local, thêm các dòng sau vào `/etc/hosts` (Linux/macOS) hoặc `C:\Windows\System32\drivers\etc\hosts` (Windows):
  
 ```
 127.0.0.1  app.fmsec.shop
@@ -404,11 +420,41 @@ chmod +x scripts/*.sh scripts/evaluation/*.sh vault/init/*.sh
  
 ## 8. Khởi chạy hệ thống
  
-### Chạy toàn bộ stack cơ bản
- 
+### Chạy local HTTPS trước khi deploy
+
+Đây là chế độ khuyến nghị khi phát triển hoặc kiểm tra luồng bình thường trên Windows/local. App vẫn chạy HTTPS, nhưng không cần domain thật.
+
 ```bash
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
+
+Sau khi chạy xong, truy cập:
+
+- App: `https://localhost:9443`
+- Keycloak: `https://localhost:8082`
+
+Trình duyệt có thể cảnh báo certificate khi dùng `https://localhost:9443` vì cert lab/domain không phải cert public cho localhost. Đây là cảnh báo bình thường trong môi trường local; luồng vẫn chạy qua HTTPS.
+
+Nếu Keycloak đang dùng volume cũ, client `spa-client` cần có:
+
+- Valid redirect URIs: `https://localhost:9443/*`
+- Web origins: `https://localhost:9443`
+
+Realm export mới đã có sẵn cấu hình này cho lần import mới.
+
+### Chạy server/domain
+
+Chế độ này dùng khi service đã được deploy lên Ubuntu/server và domain đã trỏ đúng về server.
+
+```bash
+docker compose up -d --build
+```
+
+Sau khi chạy xong, truy cập:
+
+- App: `https://app.fmsec.shop`
+- Keycloak: `https://auth.fmsec.shop`
+- API qua WAF/Kong: `https://api.fmsec.shop:8443`
  
 ### Kèm Observability (Loki, Grafana, Prometheus, cAdvisor)
  
@@ -447,16 +493,30 @@ docker compose down -v
 ---
  
 ## 9. Các điểm truy cập
- 
+
+### Local HTTPS
+
+| Dịch vụ | URL | Ghi chú |
+|---|---|---|
+| Frontend (SPA) | `https://localhost:9443` | Giao diện chính khi chạy local |
+| Keycloak Admin | `https://localhost:8082` | Admin console local |
+| API qua frontend proxy | `https://localhost:9443/api` | Frontend Nginx proxy qua WAF/Kong, có mTLS nội bộ |
+| Grafana | `http://localhost:3000` | Chỉ có khi chạy profile `obs` |
+| Prometheus | `http://localhost:9091` | Chỉ có khi chạy profile `obs` |
+| pgAdmin | `http://localhost:5050` | Chỉ có khi chạy profile `tools` |
+
+### Server/domain
+
 | Dịch vụ | URL | Ghi chú |
 |---|---|---|
 | Frontend (SPA) | `https://app.fmsec.shop` | HTTPS, port 443 |
-| Keycloak Admin | `https://auth.fmsec.shop:8082` | Admin console |
+| Keycloak Admin | `https://auth.fmsec.shop` | Admin console qua domain |
+| Keycloak nội bộ | `https://localhost:8082` | Port loopback trên server nếu cần thao tác trực tiếp qua SSH/server shell |
 | Keycloak OIDC | `https://auth.fmsec.shop/realms/cloudapi` | OIDC endpoints |
-| API (qua WAF → Kong) | `https://api.fmsec.shop:8443` | mTLS required |
-| Grafana | `http://localhost:3000` | profile obs |
-| Prometheus | `http://localhost:9091` | profile obs |
-| pgAdmin | `http://localhost:5050` | profile tools |
+| API qua WAF/Kong | `https://api.fmsec.shop:8443` | mTLS required |
+| Grafana | `http://localhost:3000` | Chạy trên server với profile `obs` |
+| Prometheus | `http://localhost:9091` | Chạy trên server với profile `obs` |
+| pgAdmin | `http://localhost:5050` | Chạy trên server với profile `tools` |
  
 > **Lưu ý bảo mật:** Kong Admin API (`KONG_ADMIN_LISTEN: "off"`) bị tắt hoàn toàn trong production config. Không có cổng admin Kong nào được expose.
  
@@ -520,47 +580,127 @@ Hệ thống có 3 role chính, định nghĩa trong Keycloak realm và enforce 
 - Backend RBAC enforce lại tại handler level (`require_roles()`).
 - BOLA guard enforce tại service level theo `user_id == order.owner_id`.
 ---
- 
+
 ## 12. Kiểm thử bảo mật
- 
+
+### SAST/SCA nội bộ
+
+Script chính của project là `scripts/security_testing/run_sast.py`. Script này tạo bằng chứng vào `EVIDENCE/security_scans/`:
+
+| File bằng chứng | Nội dung |
+|---|---|
+| `bandit_report.json` | Kết quả SAST Python bằng Bandit; nếu thiếu Bandit thì dùng fallback static checker |
+| `sca_report.txt` | Kết quả kiểm tra dependency bằng `pip-audit` trên `backend/requirements.txt` |
+| `sast_summary.md` | Tóm tắt số lượng findings và các findings đáng chú ý |
+
+Chạy local:
+
+```bash
+python scripts/security_testing/run_sast.py
+```
+
+Chạy nghiêm ngặt hơn, fail nếu có finding mức HIGH:
+
+```bash
+python scripts/security_testing/run_sast.py --strict
+```
+
+Quét thêm các script hỗ trợ trong `scripts/`:
+
+```bash
+python scripts/security_testing/run_sast.py --include-scripts
+```
+
+### Secrets scan
+
+CI dùng `detect-secrets` để phát hiện credential bị commit nhầm. Các thư mục chứa cert/key runtime như `certs/`, `internal-certs/`, `EVIDENCE/`, `node_modules/` được loại trừ để tránh nhiễu.
+
+Chạy thủ công tương tự CI:
+
+```bash
+mkdir -p EVIDENCE/security_scans
+detect-secrets scan . \
+  --exclude-files '^\.git/' \
+  --exclude-files '^node_modules/' \
+  --exclude-files '^frontend/node_modules/' \
+  --exclude-files '^EVIDENCE/' \
+  --exclude-files '^certs/' \
+  --exclude-files '^internal-certs/' \
+  --exclude-files '^zerossl-downloads/' \
+  --exclude-files '(^|/)package-lock\.json$' \
+  > EVIDENCE/security_scans/secrets.baseline
+```
+
+### DAST đầy đủ trên local HTTPS hoặc server/domain
+
+Script chính là `scripts/security_testing/run_dast.py`. Khi chạy full stack, script kiểm thử black-box các điểm sau:
+
+| Check | Mục tiêu |
+|---|---|
+| `frontend_https_available` | Frontend trả HTTP 200 qua HTTPS |
+| `kong_requires_client_certificate` | Kong/WAF chặn request thiếu client certificate |
+| `kong_https_health` | API `/health` đi qua WAF/Kong tới backend thành công |
+| `security_headers_present` | Có HSTS, `X-Content-Type-Options`, `X-Frame-Options` |
+| `rate_limit_headers_present` | Có header rate-limit của Kong |
+| `protected_endpoint_requires_auth` | Endpoint bảo vệ từ chối request thiếu auth |
+| `jwt_alg_none_rejected` | JWT giả `alg=none` bị chặn |
+
+Chạy trên server/domain:
+
+```bash
+python3 scripts/security_testing/run_dast.py \
+  --frontend-url https://app.fmsec.shop \
+  --api-url https://api.fmsec.shop:8443 \
+  --strict
+```
+
+Chạy local HTTPS:
+
+```bash
+python scripts/security_testing/run_dast.py \
+  --frontend-url https://localhost:9443 \
+  --api-url https://localhost:9443/api \
+  --strict
+```
+
+Script tạo các file:
+
+| File bằng chứng | Nội dung |
+|---|---|
+| `zap_report.html` | Báo cáo HTML; gồm kết quả ZAP nếu image ZAP có sẵn |
+| `dast_summary.json` | Kết quả từng check ở dạng JSON |
+| `dast_summary.md` | Tóm tắt DAST dạng Markdown |
+
+ZAP baseline sẽ chạy nếu image `ghcr.io/zaproxy/zaproxy:stable` có sẵn. Nếu image chưa có hoặc CI không có full stack, ZAP có thể bị skip nhưng các built-in checks vẫn tạo summary.
+
+### DAST smoke trong GitHub Actions
+
+GitHub Actions không chạy full stack domain/mTLS như server thật. Vì vậy workflow release chỉ build frontend, chạy Vite preview ở `http://127.0.0.1:4173`, chạy ZAP baseline frontend và gọi:
+
+```bash
+python scripts/security_testing/run_dast.py \
+  --frontend-url http://127.0.0.1:4173 \
+  --api-url https://localhost:8443 \
+  --frontend-only \
+  --skip-zap
+```
+
+Kết quả này dùng để bắt lỗi giao diện/build/security header cơ bản trong CI. Full DAST có giá trị xác nhận chính vẫn là lệnh chạy trên local HTTPS hoặc server/domain.
+
 ### Scripts tấn công mô phỏng (`scripts/attacks/`)
- 
+
 | Script | Mô phỏng tấn công | Kết quả mong đợi |
 |---|---|---|
-| `alg_none_attack.py` | JWT với `alg: none` | `401` — Kong jwt-hardening block |
+| `alg_none_attack.py` | JWT với `alg: none` | `401` — Kong jwt-hardening hoặc backend JWT verify block |
 | `bola_attack.py` | Truy cập đơn hàng của user khác | `403` — BOLA guard block |
 | `bola_e2e_attack.py` | BOLA end-to-end với token thật | `403` |
-| `ssrf_attack.py` | SSRF qua internal URL (169.254.x.x) | `400` — SSRF guard block |
-| `role_escalation_test.py` | Claim role cao hơn trong token | `403` — OPA/backend block |
- 
-### SAST
- 
-```bash
-# Chạy Bandit (Python static analysis)
-bash scripts/security_testing/run_sast.sh
- 
-# Hoặc trực tiếp
-bandit -r backend/ -f json -o EVIDENCE/security_scans/bandit_report.json
-```
- 
-### DAST (ZAP)
- 
-```bash
-bash tests/security_scans/dast/zap_scan.sh
-```
- 
-### Fuzz Testing (RESTler)
- 
-Cấu hình tại `tests/security_scans/fuzz/restler_config.json`. Chạy:
- 
-```bash
-bash scripts/security_testing/run_fuzz.sh
-```
- 
+| `ssrf_attack.py` | SSRF qua internal URL hoặc metadata IP | `400/403` — SSRF guard block |
+| `role_escalation_test.py` | Claim role cao hơn trong token | `401/403` — JWT verify, OPA hoặc backend RBAC block |
+
 ### OPA Policy Tests
- 
+
 ```bash
-docker exec opa opa test /tests/ -v
+docker compose exec -T opa opa test /tests/ -v
 ```
  
 ---
@@ -576,16 +716,91 @@ Kích hoạt với `--profile obs`. Sau khi stack obs chạy:
 - **Security Alerts**: `observability/loki/rules/security-alerts.yml` định nghĩa alert rules cho các event bảo mật (rate limit, auth failure, SSRF attempt...).
 - **Prometheus**: Scrape metrics từ cAdvisor (container resource usage).
 ---
- 
+
 ## 14. CI/CD Pipeline
- 
-`.github/workflows/ci.yml` kích hoạt trên mọi push/PR vào nhánh `main` hoặc `dev`:
- 
-1. **Bandit SAST** — Scan toàn bộ `backend/` source code, output JSON report.
-2. **detect-secrets** — Quét credential/secret bị commit vào repo.
-3. **Upload artifacts** — Bandit report được upload lên GitHub Actions artifacts.
-`.github/workflows/release.yml` — Workflow release (tùy chỉnh theo nhu cầu triển khai).
- 
+
+### `CI - SAST & Secrets Scan`
+
+File workflow: `.github/workflows/ci.yml`
+
+Kích hoạt khi:
+
+- `push` vào `main` hoặc `dev`
+- `pull_request` vào `main` hoặc `dev`
+
+Các bước chính:
+
+1. Checkout source code.
+2. Cài Python 3.12.
+3. Cài công cụ bảo mật: `bandit`, `detect-secrets`, `pip-audit`.
+4. Chạy:
+
+   ```bash
+   python scripts/security_testing/run_sast.py
+   ```
+
+5. Chạy `detect-secrets scan` với các exclude phù hợp cho repo.
+6. Upload artifact `sast-security-evidence`.
+
+Artifact được upload:
+
+| Artifact file | Ý nghĩa |
+|---|---|
+| `EVIDENCE/security_scans/bandit_report.json` | Kết quả SAST backend |
+| `EVIDENCE/security_scans/sca_report.txt` | Kết quả dependency audit |
+| `EVIDENCE/security_scans/sast_summary.md` | Tóm tắt SAST/SCA |
+| `EVIDENCE/security_scans/secrets.baseline` | Kết quả secrets scan |
+
+### `Release - DAST ZAP Scan`
+
+File workflow: `.github/workflows/release.yml`
+
+Kích hoạt khi:
+
+- `push` vào `main`
+
+Các bước chính:
+
+1. Checkout source code.
+2. Cài Node.js 20.
+3. Build frontend:
+
+   ```bash
+   cd frontend
+   npm ci
+   npm run build
+   ```
+
+4. Serve frontend bằng Vite preview ở `http://127.0.0.1:4173`.
+5. Chạy ZAP baseline với target frontend preview.
+6. Thu thập DAST evidence bằng:
+
+   ```bash
+   python scripts/security_testing/run_dast.py \
+     --frontend-url http://127.0.0.1:4173 \
+     --api-url https://localhost:8443 \
+     --frontend-only \
+     --skip-zap
+   ```
+
+7. Upload artifact `dast-security-evidence`.
+
+Artifact được upload:
+
+| Artifact file | Ý nghĩa |
+|---|---|
+| `EVIDENCE/security_scans/zap_report.html` | Báo cáo ZAP baseline frontend |
+| `EVIDENCE/security_scans/dast_summary.json` | Kết quả DAST dạng JSON |
+| `EVIDENCE/security_scans/dast_summary.md` | Tóm tắt DAST |
+
+### Giới hạn của CI/CD
+
+GitHub Actions không có DNS thật, cert production, Keycloak volume và mTLS runtime giống server. Vì vậy:
+
+- CI SAST/secrets dùng để chặn lỗi code, dependency và credential leak.
+- Release DAST trong GitHub là smoke test cho frontend build và security scan cơ bản.
+- Full DAST xác nhận luồng WAF/Kong/mTLS/JWT/OPA phải chạy trên local HTTPS hoặc server/domain bằng `scripts/security_testing/run_dast.py --strict`.
+
 ---
  
 ## 15. Scripts tiện ích
@@ -607,13 +822,139 @@ Kích hoạt với `--profile obs`. Sau khi stack obs chạy:
 | `scripts/evaluation/e_z2_token_hardening.sh` | Test JWT hardening |
  
 ---
- 
+
 ## 16. Triển khai Production
- 
+
 Thư mục `DEPLOY/` chứa cấu hình cho 2 kịch bản deploy:
- 
+
 - **D1** — Single-host deployment.
 - **D2** — Cấu hình nginx reverse proxy bổ sung + iptables firewall rules (`DEPLOY/D2/iptables.sh`, `DEPLOY/D2/nginx.conf`).
+
+### Quy trình khuyến nghị
+
+Nên chạy theo thứ tự sau để tránh nhầm giữa cấu hình local và cấu hình server:
+
+1. **Kiểm thử local HTTPS trên máy cá nhân**
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+   ```
+
+   Kiểm tra các luồng chính:
+
+   - Mở `https://localhost:9443`.
+   - Đăng nhập bằng tài khoản demo hoặc Google OAuth.
+   - Kiểm tra giỏ hàng, đơn hàng, tài khoản.
+   - Kiểm tra admin/staff nếu có role tương ứng.
+
+2. **Chuẩn bị server Ubuntu**
+
+   Server cần có Docker Engine, Docker Compose plugin và các port public cần thiết:
+
+   - `80/tcp`, `443/tcp` cho frontend/auth qua Nginx.
+   - `8443/tcp` cho API qua WAF/Kong.
+   - Các port quản trị như Grafana/Prometheus/pgAdmin chỉ nên bind `127.0.0.1` hoặc đặt sau VPN/SSH tunnel.
+
+3. **Trỏ domain về server**
+
+   Cấu hình DNS:
+
+   ```text
+   app.fmsec.shop   -> <SERVER_PUBLIC_IP>
+   api.fmsec.shop   -> <SERVER_PUBLIC_IP>
+   auth.fmsec.shop  -> <SERVER_PUBLIC_IP>
+   ```
+
+   Khi test nhanh chưa có DNS public, có thể thêm tạm trên máy client:
+
+   ```text
+   <SERVER_PUBLIC_IP>  app.fmsec.shop
+   <SERVER_PUBLIC_IP>  api.fmsec.shop
+   <SERVER_PUBLIC_IP>  auth.fmsec.shop
+   ```
+
+4. **Cập nhật `.env` cho server/domain**
+
+   Trên server, `.env` phải dùng domain thật:
+
+   ```dotenv
+   KEYCLOAK_URL=https://auth.fmsec.shop:8443
+   KEYCLOAK_PUBLIC_URL=https://auth.fmsec.shop
+   VITE_KEYCLOAK_URL=https://auth.fmsec.shop
+   VITE_KONG_URL=https://api.fmsec.shop:8443
+   FRONTEND_URL=https://app.fmsec.shop
+   FRONTEND_HTTP_PORT=80
+   FRONTEND_HTTPS_PORT=443
+   PUBLIC_BASE_URL=https://app.fmsec.shop
+   BACKEND_CORS_ORIGINS=https://app.fmsec.shop
+   JWT_ISSUER=https://auth.fmsec.shop/realms/cloudapi
+   AUTH_COOKIE_SECURE=true
+   KC_HOSTNAME=auth.fmsec.shop
+   ```
+
+   Không dùng các URL `https://localhost:9443` trong `.env` của server.
+
+5. **Copy code và cấu hình lên server**
+
+   Ví dụ từ máy Windows:
+
+   ```powershell
+   scp docker-compose.yml cloudapi@<SERVER_IP>:~/Cloud_Api_Security/docker-compose.yml
+   scp -r frontend backend gateway waf idp opa vault cloudapi@<SERVER_IP>:~/Cloud_Api_Security/
+   scp .env cloudapi@<SERVER_IP>:~/Cloud_Api_Security/.env
+   ```
+
+   Các file secret/cert thật nên copy riêng và kiểm tra quyền đọc:
+
+   ```powershell
+   scp -r certs internal-certs cloudapi@<SERVER_IP>:~/Cloud_Api_Security/
+   ```
+
+6. **Khởi chạy trên server**
+
+   ```bash
+   cd ~/Cloud_Api_Security
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+   Không dùng `docker-compose.local.yml` trên server/domain.
+
+7. **Kiểm tra sau deploy**
+
+   ```bash
+   curl -I https://app.fmsec.shop
+   curl -k -I https://auth.fmsec.shop
+   curl --cacert certs/kong.crt \
+     --cert internal-certs/mtls/client.crt \
+     --key internal-certs/mtls/client.key \
+     https://api.fmsec.shop:8443/health
+   ```
+
+   Nếu cần chạy DAST đầy đủ trên server:
+
+   ```bash
+   python3 scripts/security_testing/run_dast.py \
+     --frontend-url https://app.fmsec.shop \
+     --api-url https://api.fmsec.shop:8443 \
+     --strict
+   ```
+
+### Ghi chú về Keycloak volume
+
+Keycloak dùng volume bền vững để không mất cấu hình sau khi restart/recreate container. Sau khi đã chỉnh Google Client ID, Client Secret, redirect URI hoặc TOTP trên Admin Console, không chạy:
+
+```bash
+docker compose down -v
+```
+
+Lệnh này xóa volume và làm mất dữ liệu Keycloak/Postgres. Khi cần restart bình thường, dùng:
+
+```bash
+docker compose restart keycloak
+docker compose up -d --build
+```
+
 **Lưu ý quan trọng trước khi deploy production:**
  
 1. **Vault dev mode** (`vault-dev`) không dùng cho production. Thay bằng Vault production cluster có storage backend bền vững.
@@ -645,4 +986,3 @@ Thư mục `DEPLOY/` chứa cấu hình cho 2 kịch bản deploy:
 | `JWT_AUDIENCE` | Expected JWT audience | `account` |
 | `BACKEND_CORS_ORIGINS` | Allowed CORS origins | `https://app.fmsec.shop` |
 | `GRAFANA_PASSWORD` | Grafana admin password | *(strong password)* |
- 

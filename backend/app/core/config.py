@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     keycloak_client_secret: str = ""
     keycloak_public_url: str = ""
     frontend_url: str = "https://app.fmsec.shop"
+    auth_cookie_secure: bool = True
 
     # JWT verify
     jwt_issuer: str
