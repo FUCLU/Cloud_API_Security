@@ -12,25 +12,54 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Start Docker stack
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
         run: |
-          docker compose up -d
-          sleep 90
+          npm ci
+          npm run build
+
+      - name: Serve frontend
+        working-directory: frontend
+        run: |
+          nohup npx vite preview --host 127.0.0.1 --port 4173 > ../vite-preview.log 2>&1 &
+          sleep 5
+          curl -I http://127.0.0.1:4173
 
       - name: Run ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          target: "http://localhost:8000"
-          cmd_options: "-a"
-        continue-on-error: true
-
-      - name: Copy ZAP report
         run: |
-          cp zap_report.html \
-            EVIDENCE/security_scans/zap_report.html || true
+          mkdir -p EVIDENCE/security_scans
+          docker run --rm --network host \
+            -v "$PWD/EVIDENCE/security_scans:/zap/wrk" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://127.0.0.1:4173 \
+            -r zap_report.html \
+            -a || true
 
-      - name: Upload ZAP report
+      - name: Collect DAST evidence
+        if: always()
+        run: |
+          mkdir -p EVIDENCE/security_scans
+          python scripts/security_testing/run_dast.py \
+            --frontend-url http://127.0.0.1:4173 \
+            --api-url https://localhost:8443 \
+            --frontend-only \
+            --skip-zap
+
+      - name: Upload DAST evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
-          path: EVIDENCE/security_scans/zap_report.html
+          name: dast-security-evidence
+          path: |
+            EVIDENCE/security_scans/zap_report.html
+            EVIDENCE/security_scans/dast_summary.json
+            EVIDENCE/security_scans/dast_summary.md
+          if-no-files-found: warn

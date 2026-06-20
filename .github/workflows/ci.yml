@@ -14,30 +14,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      - name: Install tools
-        run: pip install bandit detect-secrets
-
-      - name: Run Bandit SAST
+      - name: Install security tools
         run: |
-          bandit -r backend/ \
-            -f json \
-            -o EVIDENCE/security_scans/bandit_report.json \
-            --exit-zero
+          python -m pip install --upgrade pip
+          python -m pip install bandit detect-secrets pip-audit
 
-      - name: Run detect-secrets
+      - name: Run SAST/SCA evidence script
+        run: |
+          mkdir -p EVIDENCE/security_scans
+          python scripts/security_testing/run_sast.py
+
+      - name: Run secrets scan
         run: |
           detect-secrets scan . \
-            --exclude-files '\.git' \
-            --exclude-files 'EVIDENCE/' \
-            > .secrets.baseline || true
+            --exclude-files '^\.git/' \
+            --exclude-files '^node_modules/' \
+            --exclude-files '^frontend/node_modules/' \
+            --exclude-files '^EVIDENCE/' \
+            --exclude-files '^certs/' \
+            --exclude-files '^internal-certs/' \
+            --exclude-files '^zerossl-downloads/' \
+            --exclude-files '(^|/)package-lock\.json$' \
+            > EVIDENCE/security_scans/secrets.baseline
 
-      - name: Upload Bandit report
+      - name: Upload SAST evidence
         uses: actions/upload-artifact@v4
         with:
-          name: bandit-report
-          path: EVIDENCE/security_scans/bandit_report.json
+          name: sast-security-evidence
+          path: |
+            EVIDENCE/security_scans/bandit_report.json
+            EVIDENCE/security_scans/sca_report.txt
+            EVIDENCE/security_scans/sast_summary.md
+            EVIDENCE/security_scans/secrets.baseline
+          if-no-files-found: error

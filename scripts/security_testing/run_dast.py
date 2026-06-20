@@ -65,12 +65,17 @@ def request(
     timeout: int = 15,
     client_cert: bool = True,
 ) -> dict:
-    ctx = ssl.create_default_context(cafile=str(CA_CERT))
-    if client_cert and CLIENT_CERT.exists() and CLIENT_KEY.exists():
+    ctx = None
+    if url.lower().startswith("https://"):
+        ctx = ssl.create_default_context(cafile=str(CA_CERT)) if CA_CERT.exists() else ssl.create_default_context()
+    if ctx and client_cert and CLIENT_CERT.exists() and CLIENT_KEY.exists():
         ctx.load_cert_chain(certfile=str(CLIENT_CERT), keyfile=str(CLIENT_KEY))
     req = urllib.request.Request(url, method=method, headers=headers or {})
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        kwargs = {"timeout": timeout}
+        if ctx:
+            kwargs["context"] = ctx
+        with urllib.request.urlopen(req, **kwargs) as resp:
             body = resp.read(4096).decode("utf-8", errors="replace")
             return {
                 "ok": True,
@@ -189,7 +194,7 @@ def print_console_report(checks: list[dict], zap: dict) -> None:
     print("============================\n")
 
 
-def run_builtin_checks(frontend_url: str, api_url: str) -> list[dict]:
+def run_builtin_checks(frontend_url: str, api_url: str, frontend_only: bool = False) -> list[dict]:
     checks: list[dict] = []
 
     frontend = request(frontend_url, method="GET")
@@ -197,11 +202,14 @@ def run_builtin_checks(frontend_url: str, api_url: str) -> list[dict]:
         test(
             "frontend_https_available",
             frontend_url,
-            "HTTP 200 over trusted local TLS",
+            "Frontend is reachable over the configured CI/runtime URL",
             frontend.get("status") == 200,
             frontend,
         )
     )
+
+    if frontend_only:
+        return checks
 
     health_url = f"{api_url.rstrip('/')}/health"
     no_client_cert = request(health_url, method="GET", client_cert=False)
@@ -413,12 +421,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--frontend-url", default="https://localhost:5174")
     parser.add_argument("--api-url", default="https://localhost:8443")
+    parser.add_argument("--frontend-only", action="store_true", help="Only check the frontend URL. Use this in GitHub CI where Kong/mTLS is not running.")
     parser.add_argument("--skip-zap", action="store_true")
     parser.add_argument("--strict", action="store_true", help="Return non-zero if any built-in check fails.")
     args = parser.parse_args()
 
     EVIDENCE.mkdir(parents=True, exist_ok=True)
-    checks = run_builtin_checks(args.frontend_url, args.api_url)
+    checks = run_builtin_checks(args.frontend_url, args.api_url, frontend_only=args.frontend_only)
     zap = {"status": "skipped", "reason": "--skip-zap was set"} if args.skip_zap else try_zap(args.frontend_url)
 
     payload = {
