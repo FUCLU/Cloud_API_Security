@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import shutil
 import ssl
 import subprocess
@@ -26,9 +27,49 @@ EVIDENCE = ROOT / "EVIDENCE" / "security_scans"
 REPORT_HTML = EVIDENCE / "zap_report.html"
 SUMMARY_JSON = EVIDENCE / "dast_summary.json"
 SUMMARY_MD = EVIDENCE / "dast_summary.md"
-CA_CERT = ROOT / "certs" / "ca.crt"
+CA_CERT_CANDIDATES = [
+    Path(os.getenv("TLS_CA_CERT", "")) if os.getenv("TLS_CA_CERT") else None,
+    ROOT / "certs" / "ca.crt",
+    ROOT / "internal-certs" / "ca.crt",
+]
+HOST_CERT_CANDIDATES = {
+    "app.fmsec.shop": [
+        Path(os.getenv("FRONTEND_TLS_CA_CERT", "")) if os.getenv("FRONTEND_TLS_CA_CERT") else None,
+        ROOT / "certs" / "app.crt",
+    ],
+    "api.fmsec.shop": [
+        Path(os.getenv("API_TLS_CA_CERT", "")) if os.getenv("API_TLS_CA_CERT") else None,
+        ROOT / "certs" / "kong.crt",
+    ],
+    "auth.fmsec.shop": [
+        Path(os.getenv("AUTH_TLS_CA_CERT", "")) if os.getenv("AUTH_TLS_CA_CERT") else None,
+        ROOT / "certs" / "auth.crt",
+    ],
+}
 CLIENT_CERT = ROOT / "internal-certs" / "mtls" / "client.crt"
 CLIENT_KEY = ROOT / "internal-certs" / "mtls" / "client.key"
+
+
+def ca_cert_path(url: str) -> Path | None:
+    host = urllib.parse.urlparse(url).hostname or ""
+    candidates = [*HOST_CERT_CANDIDATES.get(host, []), *CA_CERT_CANDIDATES]
+    for candidate in candidates:
+        if candidate and candidate.exists():
+            return candidate
+    return None
+
+
+def tls_context_for(url: str) -> ssl.SSLContext:
+    ca_path = ca_cert_path(url)
+    ctx = ssl.create_default_context(cafile=str(ca_path)) if ca_path else ssl.create_default_context()
+
+    # Lab/domain deployments often pin a locally issued leaf certificate instead
+    # of installing the whole CA chain. Python needs PARTIAL_CHAIN to accept that
+    # explicit trust anchor, while still keeping hostname and certificate checks.
+    if ca_path and hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
+        ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
+
+    return ctx
 
 
 def now() -> str:
@@ -67,7 +108,7 @@ def request(
 ) -> dict:
     ctx = None
     if url.lower().startswith("https://"):
-        ctx = ssl.create_default_context(cafile=str(CA_CERT)) if CA_CERT.exists() else ssl.create_default_context()
+        ctx = tls_context_for(url)
     if ctx and client_cert and CLIENT_CERT.exists() and CLIENT_KEY.exists():
         ctx.load_cert_chain(certfile=str(CLIENT_CERT), keyfile=str(CLIENT_KEY))
     req = urllib.request.Request(url, method=method, headers=headers or {})
