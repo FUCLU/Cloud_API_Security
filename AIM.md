@@ -1,4 +1,4 @@
-# AIM — Project Objectives & Research Questions
+# AIM — Mục tiêu & Câu hỏi nghiên cứu
 
 **Đề tài:** Cloud API-Based Network Application Security for Small Company Services  
 **Môn:** NT219.Q21.ANTT — Mật mã học | UIT
@@ -7,89 +7,104 @@
 
 ## 1. Bối cảnh & Động lực
 
-Các công ty nhỏ (SME) ngày càng phụ thuộc vào API để vận hành dịch vụ — từ mobile app, SPA, đến tích hợp bên thứ ba. Tuy nhiên, phần lớn SME thiếu nhân lực bảo mật chuyên biệt và ngân sách hạn chế, dẫn đến các lỗ hổng phổ biến: token bị đánh cắp, BOLA (Broken Object Level Authorization), Broken Authentication, và thiếu rate limiting.
+Các công ty nhỏ ngày càng phụ thuộc vào API để vận hành dịch vụ: frontend SPA, hệ thống quản trị, tích hợp đăng nhập bên thứ ba, webhook và các luồng dữ liệu giữa backend với database/cache/KMS. Tuy nhiên, mô hình triển khai phổ biến của SME thường có ba vấn đề:
 
-Theo OWASP API Security Top 10 (2023), BOLA và Broken Authentication chiếm tỷ lệ khai thác cao nhất trong các hệ thống API thực tế. Một incident đơn lẻ có thể gây tổn thất uy tín và tài chính nghiêm trọng cho tổ chức nhỏ không có năng lực phục hồi nhanh.
+- API public nhưng thiếu lớp gateway/policy rõ ràng.
+- Dữ liệu và token đi qua nhiều service container nhưng vẫn tin vào "mạng nội bộ".
+- Secret, certificate và khóa mã hoá thường được quản lý thủ công, dễ lộ hoặc khó rotate.
 
-Đề tài này xuất phát từ câu hỏi thực tế: **liệu một SME có thể triển khai hệ thống API an toàn với stack mã nguồn mở, chi phí vận hành thấp, và khả năng tự động hóa cao không?**
-
----
-
-## 2. Mục tiêu Tổng thể
-
-Thiết kế, triển khai và đánh giá một **hệ thống API security hoàn chỉnh** phù hợp với quy mô công ty nhỏ, bao gồm:
-
-- Bảo vệ mặt phẳng API (authentication, authorization, token lifecycle)
-- Bảo vệ luồng mạng (TLS 1.3, mTLS east-west, network segmentation)
-- Phát hiện và phản ứng tự động (structured logging, Grafana alerting, attack simulation)
-- Vận hành tiết kiệm chi phí (toàn bộ stack mã nguồn mở, Docker Compose một lệnh)
+Đề tài này xây dựng một hệ thống mô phỏng thương mại điện tử nhỏ (`users`, `products`, `orders`) để trả lời câu hỏi thực tế: **một SME có thể triển khai Cloud API an toàn bằng stack mã nguồn mở, Docker Compose và quy trình vận hành có thể kiểm chứng được hay không?**
 
 ---
 
-## 3. Câu hỏi Nghiên cứu
+## 2. Mục tiêu tổng thể
+
+Thiết kế, triển khai và đánh giá một hệ thống **Cloud API Security** theo hướng Zero Trust, tập trung vào các mục tiêu:
+
+- **Xác thực an toàn:** OIDC Authorization Code + PKCE qua Keycloak, token ES256, HttpOnly cookie/session.
+- **Phân quyền nhiều lớp:** OPA tại Kong gateway, RBAC tại backend, BOLA guard theo ownership.
+- **Bảo vệ đường truyền:** TLS/mTLS cho các kết nối quan trọng, WAF -> Kong dùng client certificate.
+- **Mã hoá dữ liệu nhạy cảm:** AES-256-GCM tại application layer, DEK được unwrap từ Vault Transit.
+- **Chống tấn công API phổ biến:** JWT `alg=none`, BOLA/IDOR, SSRF, webhook giả mạo, brute force/flood cơ bản.
+- **Vận hành và đánh giá:** có script kiểm thử, log, dashboard, bằng chứng deploy server và runbook cấu hình.
+
+---
+
+## 3. Câu hỏi nghiên cứu
 
 **RQ1 — Kiến trúc:**  
-Kiến trúc nào (API Gateway + IdP + OPA + KMS) cân bằng tốt nhất giữa bảo mật, vận hành và chi phí cho SME sử dụng công nghệ mã nguồn mở?
+Kiến trúc gồm Frontend Nginx, WAF Nginx, Kong API Gateway, Keycloak, OPA, FastAPI, PostgreSQL, Redis và Vault có đủ rõ ràng để áp dụng cho một SME mà vẫn giữ chi phí vận hành thấp không?
 
-**RQ2 — Phòng chống tấn công:**  
-Các vector tấn công API phổ biến nhất với SME (BOLA, JWT alg=none, DPoP replay, nonce reuse) có thể được phòng chống hoàn toàn bằng policy-as-code và token binding không?
+**RQ2 — Xác thực & phân quyền:**  
+OIDC/PKCE, JWT ES256, OPA policy và backend RBAC/BOLA có thể giảm các rủi ro Broken Authentication, Broken Function Level Authorization và BOLA/IDOR đến mức kiểm thử được không?
 
 **RQ3 — Mật mã học:**  
-Giải pháp mật mã 3 lớp (TLS 1.3 + AES-256-GCM AEAD + Envelope Encryption KEK/DEK) có đảm bảo confidentiality và integrity toàn diện cho dữ liệu in-transit và at-rest không?
+Kết hợp TLS/mTLS, AES-256-GCM và Vault Transit có bảo vệ được dữ liệu in-transit và field nhạy cảm at-rest trong phạm vi hệ thống demo không?
 
 **RQ4 — Vận hành:**  
-Hệ thống có thể đạt SLA key rotation ≤ 10 phút và blast-radius ≤ 24h trong điều kiện kiểm thử với HashiCorp Vault Transit Engine không?
+Các thao tác như deploy server Ubuntu, sinh certificate, rotate Vault key, chạy DAST/SAST và thu thập evidence có đủ đơn giản để tái lập trong môi trường lab không?
 
 ---
 
-## 4. Giả thuyết Nghiên cứu
+## 4. Giả thuyết nghiên cứu
 
-> Một stack gồm **Kong API Gateway** (rate limit + WAF + JWT validation) + **Keycloak** (OIDC/PKCE) + **OPA** (deny-by-default RBAC→ABAC) + **HashiCorp Vault** (envelope encryption KEK/DEK) + **AES-256-GCM** (AEAD at-rest) sẽ:
->
-> 1. Chặn **100%** các cuộc tấn công JWT alg=none, DPoP replay, và BOLA/IDOR trong điều kiện kiểm thử.
-> 2. Đảm bảo **0 byte** plaintext rò rỉ trên kênh TLS 1.3.
-> 3. Đạt SLA key rotation **≤ 10 phút** và phát hiện toàn bộ tamper qua AEAD auth tag.
-> 4. Cho phép **100%** quyết định AuthZ được giải thích từ OPA decision log.
+Project kiểm chứng các giả thuyết sau trong phạm vi lab:
+
+1. Kong + backend JWT verification có thể chặn token giả mạo như `alg=none` và token sai issuer/audience.
+2. OPA policy tại gateway kết hợp backend RBAC/BOLA có thể chặn truy cập sai role và truy cập đơn hàng không thuộc owner.
+3. SSRF guard có thể chặn URL trỏ đến localhost, private IP, link-local và metadata endpoint sau khi resolve DNS.
+4. AES-256-GCM phát hiện ciphertext bị chỉnh sửa thông qua GCM authentication tag.
+5. WAF + mTLS giữa WAF và Kong giúp giảm khả năng bypass gateway và chặn request độc hại cơ bản ở edge.
+6. Vault Transit hỗ trợ mô hình KEK/DEK và rotation trong môi trường lab, nhưng Vault dev mode không đại diện cho production thật.
 
 ---
 
 ## 5. Phạm vi & Giới hạn
 
 **Trong phạm vi:**
-- Deployment D1: Docker Compose — môi trường kiểm thử một máy
-- Deployment D2: Linux VM Ubuntu 22.04 + mTLS east-west
-- Các attack vector: JWT alg=none, DPoP replay, BOLA/IDOR, nonce reuse
-- Đánh giá theo 6 invariants (I1–I6) đo lường được
+
+- Docker Compose single-host cho local và server Ubuntu.
+- OIDC/PKCE qua Keycloak realm `cloudapi`.
+- Kong declarative config, custom plugins `jwt-hardening`, `opa-authz`, `hsts-header`.
+- OPA Rego policy cho role × method × path.
+- TLS/mTLS, internal CA, public cert cho domain production.
+- AES-256-GCM + Vault Transit cho field nhạy cảm trong dữ liệu seed/demo.
+- Attack simulation: JWT `alg=none`, BOLA, SSRF, role escalation.
+- Observability bằng Grafana, Loki, Prometheus, Promtail.
 
 **Ngoài phạm vi:**
-- Môi trường production multi-region
-- ML-based anomaly detection
-- Tích hợp SOAR/automated incident response
-- WAF rule tuning dựa trên traffic thực
 
-**Giới hạn đạo đức:**
-- Pentest chỉ thực hiện trên hạ tầng kiểm thử tự kiểm soát
-- Toàn bộ dữ liệu test là synthetic — không dùng dữ liệu người dùng thật
-- Logs được sanitize trước khi đưa vào EVIDENCE/
+- Production multi-region, autoscaling, Kubernetes hoặc service mesh.
+- Vault production cluster có storage backend bền vững.
+- WAF rule tuning bằng traffic thật.
+- SIEM/SOAR hoặc incident response tự động.
+- Chống DDoS layer 3/4 quy mô lớn.
 
----
+**Giới hạn hiện tại cần ghi rõ:**
 
-## 6. Đóng góp Dự kiến
-
-1. **Kiến trúc tham chiếu** cho SME: sơ đồ đầy đủ từ Client Layer → Security & Service Layer → Observability, tái sử dụng được.
-2. **Giải pháp mật mã 3 lớp** có thể verify: mỗi lớp có invariant đo lường, script evaluation, và evidence (pcap, log, screenshot).
-3. **Bộ attack simulation** reproducible: 4 kịch bản tấn công với expected output cụ thể.
-4. **Tài liệu vận hành** hoàn chỉnh: RUNBOOK, key rotation procedure, incident response checklist.
+- TOTP setup/verify đã có, nhưng muốn enforce mọi request admin/staff thì cần bảo đảm endpoint hoặc middleware gọi `check_totp_required()`.
+- Rate limit hiện là limit toàn cục theo IP tại Kong; chưa phải lockout riêng theo user/session.
+- `.github/workflows` chưa được commit, nên CI/CD hiện là pipeline đề xuất.
+- Một số certificate demo có thể tồn tại trong repo để phục vụ lab; production thật phải sinh lại và thay secret.
 
 ---
 
-## 7. Liên kết với Môn học
+## 6. Đóng góp chính
+
+1. **Kiến trúc tham chiếu Cloud API Security cho SME:** đầy đủ edge, gateway, IdP, policy engine, backend, database, cache, KMS và observability.
+2. **Bộ cơ chế bảo mật có thể kiểm chứng:** JWT hardening, OPA authz, BOLA guard, SSRF guard, WAF filtering, webhook HMAC, TLS/mTLS, AES-GCM.
+3. **Bộ tài liệu vận hành:** README hướng dẫn local/server, copy code lên Ubuntu, tạo `.env`, certificate, Vault DEK, health check và evidence.
+
+---
+
+## 7. Liên kết với môn Mật mã học
 
 | Chủ đề NT219 | Áp dụng trong project |
 |---|---|
-| Mật mã đối xứng (AES) | AES-256-GCM AEAD at-rest, TLS 1.3 record encryption |
-| Mật mã bất đối xứng (RSA/EC) | JWT RS256 signing (Keycloak), DPoP proof EC keypair, mTLS certificates |
-| Hàm băm & MAC | AEAD auth tag (GCM), TOTP HMAC-SHA1, DPoP jti tracking |
-| Quản lý khóa | HashiCorp Vault KEK/DEK, key rotation SLA, envelope encryption |
-| Giao thức xác thực | OAuth 2.0 + PKCE (RFC 7636), OIDC, DPoP (RFC 9449) |
-| Bảo mật mạng | TLS 1.3 (RFC 8446), mTLS east-west, network segmentation D2 |
+| Mật mã đối xứng | AES-256-GCM cho field nhạy cảm; TLS record encryption |
+| Mật mã bất đối xứng | ES256 JWT signing, certificate TLS/mTLS, internal CA |
+| Hàm băm & MAC | HMAC trong TOTP, HMAC-SHA256 cho webhook signature, GCM auth tag |
+| Quản lý khóa | Vault Transit KEK/DEK, wrapped DEK, key rotation |
+| Giao thức xác thực | OAuth 2.0 Authorization Code, PKCE, OpenID Connect |
+| Bảo mật mạng | TLS, mTLS, gateway/WAF, network segmentation bằng Docker networks |
+
