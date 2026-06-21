@@ -37,6 +37,8 @@ Hệ thống API bảo mật đa tầng được xây dựng theo kiến trúc Z
 14. [Observability & Giám sát](#14-observability--giám-sát)
 15. [CI/CD Pipeline đề xuất](#15-cicd-pipeline-đề-xuất)
 16. [Scripts tiện ích](#16-scripts-tiện-ích)
+17. [Authors](#authors)
+18. [License](#license)
 ---
  
 ## 1. Kiến trúc tổng quan
@@ -1091,3 +1093,23 @@ Khi bổ sung workflow release, nên kích hoạt trên push vào `main`. Pipeli
 | `FRONTEND_HTTP_PORT` | `9080` | `80` |
 | `FRONTEND_URL` | `https://localhost:9444` | `https://app.fmsec.shop` |
 | `BACKEND_CORS_ORIGINS` | `https://localhost:9444` | `https://app.fmsec.shop` |
+
+---
+
+## Authors
+
+Project được thực hiện bởi nhóm sinh viên:
+
+- **Lưu Hồng Phúc** — Nhóm trưởng
+- **Phan Thái Hưng** — Thành viên
+- **Võ Tưởng Tuấn Kiệt** — Thành viên
+
+## License
+
+Copyright © 2026 Lưu Hồng Phúc, Phan Thái Hưng, Võ Tưởng Tuấn Kiệt.
+
+Dự án này được phát triển phục vụ mục đích học tập, nghiên cứu và đánh giá bảo mật trong khuôn khổ môn **NT219.Q21.ANTT — Mật mã học**.
+
+Toàn bộ mã nguồn, tài liệu, cấu hình triển khai, hình ảnh minh chứng và bằng chứng kiểm thử trong repository này thuộc quyền sở hữu của nhóm tác giả. Không được sao chép, phân phối, chỉnh sửa, sử dụng cho mục đích thương mại hoặc triển khai production thật khi chưa có sự đồng ý bằng văn bản của nhóm tác giả.
+
+Các thư viện, framework, container image và công cụ mã nguồn mở được sử dụng trong project vẫn tuân theo license gốc của từng dự án tương ứng.
